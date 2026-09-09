@@ -1447,3 +1447,17 @@ option { background: #111; color: #e8e8e8; }
   margin-left: auto; font-size: 9px; text-transform: uppercase;
   letter-spacing: .06em; color: var(--muted2); font-family: var(--font-mono);
 }
+/* ══════════════════════════════════════════════════════
+   ACCESSIBILITÉ — mouvement réduit
+   Respecte la préférence système : coupe/raccourcit toutes les
+   animations (pulse, spin, shimmer, dot-float…) pour les utilisateurs
+   sensibles au mouvement, sans changer la mise en page.
+   ══════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

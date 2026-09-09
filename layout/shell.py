@@ -96,7 +96,7 @@ def sidebar(active_page: str, slim: bool = False, running: bool = False,
     # Recherche + actualiser + notifications (toujours visibles en bas, avant Paramètres)
     footer_children.append(html.Div(
         id="btn-open-search", n_clicks=0, className="nav-item",
-        role="button", tabIndex=0,
+        role="button", tabIndex=0, **{"aria-label": "Rechercher (Ctrl+K)"},
         children=[
             html.Div(className="nav-icon", children=[svg(ICO_SEARCH, size=16)]),
             html.Div("Rechercher", className="nav-label") if not slim else None,
@@ -105,6 +105,7 @@ def sidebar(active_page: str, slim: bool = False, running: bool = False,
     footer_children.append(html.Div(
         id="btn-refresh-page", n_clicks=0, className="nav-item",
         role="button", tabIndex=0, title="Actualiser la page sans naviguer",
+        **{"aria-label": "Actualiser la page"},
         children=[
             html.Div(className="nav-icon", children=[svg(ICO_REFRESH, size=16)]),
             html.Div("Actualiser", className="nav-label") if not slim else None,
@@ -114,6 +115,7 @@ def sidebar(active_page: str, slim: bool = False, running: bool = False,
     footer_children.append(html.Div(
         id="btn-notif-bell", n_clicks=0, className="nav-item",
         role="button", tabIndex=0, style={"position": "relative"},
+        **{"aria-label": f"Notifications ({unread_count} non lues)" if unread_count else "Notifications"},
         children=[
             html.Div(className="nav-icon", children=[
                 svg(ICO_BELL, size=16),
