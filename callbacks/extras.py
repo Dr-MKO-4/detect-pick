@@ -462,6 +462,40 @@ clientside_callback(
 )
 
 
+# ── Sélecteur d'année : zoom des figures temporelles sans recalcul ───────────
+# Filtre uniquement la fenêtre affichée (xaxis.range) des figures à axe de
+# type "date" — aucun impact sur le pipeline, qui continue de tourner sur
+# tout l'historique (nécessaire pour STL/RPCA/LOF*).
+
+clientside_callback(
+    """
+    function(annee) {
+        var ids = ['graph-fig3', 'graph-fig10', 'graph-fig11', 'graph-figA',
+                    'graph-figB', 'graph-figD', 'graph-figE', 'graph-figE_bis'];
+        var range = (annee && annee !== 'all')
+            ? [annee + '-01-01', (parseInt(annee, 10) + 1) + '-01-01']
+            : null;
+        ids.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (!el || !window.Plotly) return;
+            var gd = el.querySelector('.js-plotly-plot') || el;
+            try {
+                if (range) {
+                    window.Plotly.relayout(gd, {'xaxis.range': range, 'xaxis.autorange': false});
+                } else {
+                    window.Plotly.relayout(gd, {'xaxis.autorange': true});
+                }
+            } catch (e) { /* figure pas encore montée : ignorer */ }
+        });
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("annee-dummy", "children"),
+    Input("dd-annee", "value"),
+    prevent_initial_call=True,
+)
+
+
 # ── Feedback visuel bouton Générer rapport ────────────────────────────────────
 
 clientside_callback(

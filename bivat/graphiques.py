@@ -16,6 +16,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from beac_lof.loader import charger_labels
+
 PAYS_CEMAC = ["cameroun", "congo", "gabon", "guinee_eq", "rca", "tchad"]
 PAYS_LABELS = {
     "cameroun":  "Cameroun",
@@ -80,6 +82,18 @@ class BiVATGraphiques:
     def __init__(self, pipeline, lof_pipeline=None):
         self.p   = pipeline        # PipelineBiVAT
         self.lof = lof_pipeline    # PipelineLOF (optional, needed for D & G)
+        self._label_maps_cache: dict = {}
+
+    def _short_label(self, code: str, maxlen: int = 34) -> str:
+        """Nom lisible et court pour un indicateur (au lieu du code IFS brut),
+        à partir du fichier source de (self.p._pays, self.p._volet)."""
+        k = (self.p._pays, self.p._volet)
+        if k not in self._label_maps_cache:
+            self._label_maps_cache[k] = charger_labels("data", self.p._pays, self.p._volet)
+        name = self._label_maps_cache[k].get(str(code))
+        if not name or name.lower() == "nan":
+            return str(code)
+        return name if len(name) <= maxlen else name[: maxlen - 1].rstrip() + "…"
 
     # ══════════════════════════════════════════════════════════════════════════
     # Fig. E  CP intervals on calibration window
@@ -384,7 +398,7 @@ class BiVATGraphiques:
             # Get top_n indicators with signed values
             d = len(feat)
             order = np.argsort(np.abs(sv))[::-1][:top_n]
-            y_labels = [feat[j] for j in order][::-1]
+            y_labels = [self._short_label(feat[j]) for j in order][::-1]
             x_vals   = [float(sv[j]) for j in order][::-1]
             colors   = [RED if v > 0 else BLUE for v in x_vals]
 

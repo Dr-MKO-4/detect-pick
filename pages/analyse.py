@@ -1,4 +1,5 @@
 """Page Analyse  figures LOF*/BiVAT par phase."""
+from datetime import datetime as _dt
 from dash import html, dcc
 from config import PAYS, PAYS_LABELS, VOLETS
 from layout.icons import svg, ICO_PULSE, ICO_PLAY, ICO_STOP, ICO_CHECK, ICO_WARN
@@ -68,7 +69,9 @@ _PHASE_BTN_LABELS = {
 
 
 def analyse_controls(running: bool = False, modele: str = "lof",
-                     progress: int = 0, progress_label: str = "") -> html.Div:
+                     progress: int = 0, progress_label: str = "",
+                     pays: str = "cameroun", volet: str = "Actif",
+                     annee: str = "all") -> html.Div:
     return html.Div(className="analyse-controls-panel", children=[
         # Section: Sélection
         html.Div("SÉLECTION", className="label", style={"marginBottom": "8px"}),
@@ -77,7 +80,18 @@ def analyse_controls(running: bool = False, modele: str = "lof",
             dcc.Dropdown(
                 id="dd-pays",
                 options=[{"label": PAYS_LABELS[p], "value": p} for p in PAYS],
-                value="cameroun", clearable=False, className="select",
+                value=pays, clearable=False, className="select",
+            ),
+        ]),
+        html.Div([
+            html.Div("Année", className="label"),
+            dcc.Dropdown(
+                id="dd-annee",
+                options=[{"label": "Toutes", "value": "all"}] + [
+                    {"label": str(y), "value": str(y)}
+                    for y in range(_dt.now().year, 2009, -1)
+                ],
+                value=annee, clearable=False, className="select",
             ),
         ]),
         html.Div([
@@ -85,7 +99,7 @@ def analyse_controls(running: bool = False, modele: str = "lof",
             dcc.Dropdown(
                 id="dd-volet",
                 options=[{"label": v, "value": v} for v in VOLETS],
-                value="Actif", clearable=False, className="select",
+                value=volet, clearable=False, className="select",
             ),
         ]),
         html.Hr(style={"border": "none", "borderTop": "1px solid var(--border)", "margin": "8px 0"}),
@@ -169,7 +183,8 @@ def render_analyse(pays: str = "cameroun", volet: str = "Actif",
                    modele: str = "lof", phase: int = 1,
                    running: bool = False, results=None,
                    bivat_results=None,
-                   progress: int = 0, progress_label: str = "") -> html.Div:
+                   progress: int = 0, progress_label: str = "",
+                   annee: str = "all") -> html.Div:
     is_bivat    = modele == "bivat"
     model_label = "BiVAT" if is_bivat else "LOF*"
     valid_phases = [2, 4] if is_bivat else [1, 2, 3]
@@ -277,7 +292,8 @@ def render_analyse(pays: str = "cameroun", volet: str = "Actif",
         topbar_div,
         html.Div(style={"display": "flex", "flex": "1", "minHeight": "0", "overflow": "hidden"}, children=[
             analyse_controls(running=running, modele=modele,
-                             progress=progress, progress_label=progress_label),
+                             progress=progress, progress_label=progress_label,
+                             pays=pays, volet=volet, annee=annee),
             html.Div(className="content", style={"flex": "1"}, children=[
                 html.Div(
                     className="grid-figs",

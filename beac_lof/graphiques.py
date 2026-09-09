@@ -21,6 +21,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from typing import Optional
 
+from .loader import charger_labels
+
 PAYS_CEMAC = ["cameroun", "congo", "gabon", "guinee_eq", "rca", "tchad"]
 VOLETS = ["Actif", "Passif"]
 
@@ -110,6 +112,32 @@ class BEACGraphiques:
     def _label(self, pays: str, volet: str) -> str:
         return f"{pays.capitalize()} / {volet}"
 
+    def _label_map(self, pays: str, volet: str) -> dict[str, str]:
+        """{code IFS -> nom complet}, chargé une fois puis mis en cache
+        (voir loader.charger_labels, déjà lui-même mis en cache disque)."""
+        cache = getattr(self, "_label_maps_cache", None)
+        if cache is None:
+            cache = self._label_maps_cache = {}
+        k = self._k(pays, volet)
+        if k not in cache:
+            cache[k] = charger_labels("data", pays, volet)
+        return cache[k]
+
+    def _short_label(self, code: str, pays: str, volet: str, maxlen: int = 28) -> str:
+        """Libellé court et lisible pour un axe (nom complet tronqué), au lieu
+        du code IFS brut (ex. '62221A.F.R...{Z}') qui n'est pas interprétable
+        sans la légende. Le nom complet reste disponible via _full_label()."""
+        name = self._label_map(pays, volet).get(str(code))
+        if not name or name.lower() == "nan":
+            return str(code)
+        return name if len(name) <= maxlen else name[: maxlen - 1].rstrip() + "…"
+
+    def _full_label(self, code: str, pays: str, volet: str) -> str:
+        """Nom complet de l'indicateur (pour hovertemplate / légende), avec
+        repli sur le code IFS si l'indicateur n'est pas dans la table."""
+        name = self._label_map(pays, volet).get(str(code))
+        return name if name and name.lower() != "nan" else str(code)
+
     def _all_keys(self):
         """Retourne toutes les paires (pays, volet) disponibles dans scores_lof."""
         keys = []
@@ -190,13 +218,15 @@ class BEACGraphiques:
                 z_data.append(mask)
                 if not x_labels:
                     x_labels = [_fmt_mois(d) for d in df.index]
-            y_labels_map[k] = df.columns.tolist() if not df.empty else []
+            y_labels_map[k] = ([self._short_label(c, p, v) for c in df.columns]
+                               if not df.empty else [])
 
         k_init = self._k(pays, volet)
         df_init = self.data_brute.get(k_init, pd.DataFrame())
         z_init = df_init.isnull().astype(int).values.T.tolist() if not df_init.empty else [[]]
         x_init = [_fmt_mois(d) for d in df_init.index] if not df_init.empty else []
-        y_init = df_init.columns.tolist() if not df_init.empty else []
+        y_init = ([self._short_label(c, pays, volet) for c in df_init.columns]
+                  if not df_init.empty else [])
 
         fig = go.Figure(go.Heatmap(
             z=z_init, x=x_init, y=y_init,
@@ -211,7 +241,7 @@ class BEACGraphiques:
             df = self.data_brute.get(k, pd.DataFrame())
             z = df.isnull().astype(int).values.T.tolist() if not df.empty else [[]]
             x = [_fmt_mois(d) for d in df.index] if not df.empty else []
-            y = df.columns.tolist() if not df.empty else []
+            y = [self._short_label(c, p, v) for c in df.columns] if not df.empty else []
             trace_updates.append({"z": [z], "x": [x], "y": [y]})
             layout_updates.append({"title.text": f"Fig. 1  Carte des valeurs manquantes  {self._label(p, v)}"})
 
@@ -1119,7 +1149,8 @@ class BEACGraphiques:
             indicators = top.index.tolist()[::-1]          # ascending for horizontal bar
             values     = [row[ind] for ind in indicators]
             colors     = ["#E05252" if v > 0 else "#5BA8E5" for v in values]
-            return indicators, values, colors
+            labels     = [self._short_label(ind, pays, volet, maxlen=34) for ind in indicators]
+            return labels, values, colors
 
         anom_init = _anom_months(scores_init, res_init, tau_init)
 
@@ -1181,9 +1212,9 @@ class BEACGraphiques:
                 zeroline=True,
                 zerolinecolor="rgba(255,255,255,0.2)",
             ),
-            yaxis=dict(title="Indicateur IFS", automargin=True),
+            yaxis=dict(title="Indicateur", automargin=True),
             height=560,
-            margin=dict(t=120, b=80, l=160, r=80),
+            margin=dict(t=120, b=80, l=220, r=80),
         )
         return fig
 
@@ -1236,7 +1267,8 @@ class BEACGraphiques:
         fig = go.Figure(go.Heatmap(
             z=sub_init.T.values.tolist() if not sub_init.empty else [[]],
             x=[_fmt_mois(d) for d in sub_init.index] if not sub_init.empty else [],
-            y=sub_init.columns.tolist() if not sub_init.empty else [],
+            y=([self._short_label(c, pays, volet) for c in sub_init.columns]
+               if not sub_init.empty else []),
             colorscale="RdBu",
             zmid=0, zmin=-vmax_init, zmax=vmax_init,
             colorbar=dict(title="Déviation résiduelle"),
@@ -1254,7 +1286,7 @@ class BEACGraphiques:
             trace_updates.append({
                 "z": [sub.T.values.tolist() if not sub.empty else [[]]],
                 "x": [[_fmt_mois(d) for d in sub.index] if not sub.empty else []],
-                "y": [sub.columns.tolist() if not sub.empty else []],
+                "y": [[self._short_label(c, p, v) for c in sub.columns] if not sub.empty else []],
                 "zmin": [-vm], "zmax": [vm],
             })
             layout_updates.append({"title.text": f"Fig. 13  Heatmap anomalies  {self._label(p, v)}"})

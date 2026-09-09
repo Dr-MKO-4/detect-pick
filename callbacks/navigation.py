@@ -112,6 +112,15 @@ def sync_modele(v):
 
 
 @callback(
+    Output("store-annee", "data"),
+    Input("dd-annee",     "value"),
+    prevent_initial_call=True,
+)
+def sync_annee(v):
+    return v or "all"
+
+
+@callback(
     Output("store-refresh", "data"),
     Input("btn-refresh-page", "n_clicks"),
     State("store-refresh",    "data"),

@@ -59,6 +59,35 @@ def _load_raw(path: Path) -> pd.DataFrame:
     return df
 
 
+_LABELS_CACHE: dict[tuple, dict[str, str]] = {}
+
+
+def charger_labels(data_dir: Path, pays: str, volet: str) -> dict[str, str]:
+    """
+    Retourne {IFS Code -> nom complet de l'indicateur} pour (pays, volet),
+    à partir de la colonne 'Indicateurs' du fichier source (celle-là même
+    que 'IFS Code' utilisée comme identifiant de série dans le pipeline).
+
+    Sert à afficher un libellé lisible (raccourci) sur les axes des figures
+    et une légende complète (code -> nom) plutôt que le code IFS brut, très
+    long et peu parlant pour un analyste.
+    """
+    from .config import FILE_MAP
+    fname = f"{FILE_MAP[pays.lower()]}_{volet}.xlsx"
+    path = Path(data_dir) / fname
+    cache_key = (str(path), pays.lower(), volet)
+    if cache_key in _LABELS_CACHE:
+        return _LABELS_CACHE[cache_key]
+
+    try:
+        df_raw = pd.read_excel(path)
+        labels = dict(zip(df_raw["IFS Code"].astype(str), df_raw["Indicateurs"].astype(str)))
+    except Exception:
+        labels = {}
+    _LABELS_CACHE[cache_key] = labels
+    return labels
+
+
 def _detect_structural_start(df: pd.DataFrame) -> pd.Timestamp:
     """
     Retourne la première date de la fenêtre après troncature structurelle (MNAR tête).

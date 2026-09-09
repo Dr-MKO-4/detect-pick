@@ -53,6 +53,7 @@ app.layout = html.Div(
         dcc.Store(id="store-phase",            data=1),
         dcc.Store(id="store-pays",             data="cameroun"),
         dcc.Store(id="store-volet",            data="Actif"),
+        dcc.Store(id="store-annee",            data="all"),
         dcc.Store(id="store-pref-sync",        data=None),
         dcc.Store(id="store-progress",         data=0),
         dcc.Store(id="store-progress-label",   data=""),
@@ -74,6 +75,7 @@ app.layout = html.Div(
         html.Span(id="btn-theme", style={"display": "none"}),
         html.Span(id="pg-dummy", style={"display": "none"}),
         html.Span(id="global-anim-dummy", style={"display": "none"}),
+        html.Span(id="annee-dummy", style={"display": "none"}),
         # ── Animations globales (persistent across page navigation) ───────────
         # Barre fine dorée fixée en haut de l'écran
         html.Div(id="global-top-bar"),
@@ -161,12 +163,13 @@ from layout import shell_layout
     State("store-progress-label",   "data"),
     State("store-pays",             "data"),
     State("store-volet",            "data"),
+    State("store-annee",            "data"),
     State("store-auth",             "data"),
     State("store-theme",            "data"),
 )
 def render_page(page, results, bivat_results, phase,
                 running, bivat_running, modele, _refresh, progress, progress_label,
-                pays, volet, auth, theme):
+                pays, volet, annee, auth, theme):
     # Rediriger vers login si pas authentifié
     if not auth and page != "login":
         return render_login()
@@ -201,6 +204,7 @@ def render_page(page, results, bivat_results, phase,
             modele=modele or "lof", phase=phase or 1,
             running=any_running, results=results, bivat_results=bivat_results,
             progress=progress or 0, progress_label=progress_label or "",
+            annee=annee or "all",
         )
         return _shell(page, content, running=any_running,
                       pays=pays or "cameroun", volet=volet or "Actif")
