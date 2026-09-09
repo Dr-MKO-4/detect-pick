@@ -1,0 +1,666 @@
+\documentclass[12pt,a4paper]{article}
+
+% ── Encodage et langue ──────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+
+% ── Mise en page ─────────────────────────────────────────────────
+\usepackage[top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% ── Mathématiques ────────────────────────────────────────────────
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{mathtools}
+\usepackage{bm}
+
+% ── Tableaux ─────────────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{longtable}
+
+% ── Typographie et mise en forme ─────────────────────────────────
+\usepackage{microtype}
+\usepackage{lmodern}
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+% ── Liens et méta-données ────────────────────────────────────────
+\usepackage[colorlinks=true, linkcolor=black, citecolor=black, urlcolor=blue]{hyperref}
+
+% ── En-tête / pied de page ───────────────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{BiVAT  État de l'art VAE-Transformer}}
+\fancyhead[R]{\small\textit{MOUKOKO EKAMBI G.M.}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ── Sections ─────────────────────────────────────────────────────
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\itshape}{\thesubsubsection}{0.5em}{}
+
+% ── Résumé personnalisé ──────────────────────────────────────────
+\usepackage{abstract}
+\renewcommand{\abstractname}{Résumé}
+
+% ── Bibliographie ────────────────────────────────────────────────
+\usepackage{natbib}
+
+% ════════════════════════════════════════════════════════════════
+\begin{document}
+
+% ── Page de titre ────────────────────────────────────────────────
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+
+{\LARGE\bfseries
+DÉTECTION DE VARIATIONS ATYPIQUES DANS LES SÉRIES TEMPORELLES
+FINANCIÈRES PAR ARCHITECTURES HYBRIDES VAE-TRANSFORMER \\[0.4em]
+}
+
+\vspace{2cm}
+
+{\large\bfseries MOUKOKO EKAMBI GEORGES MIGUEL}\\[0.5em]
+{\normalsize\itshape
+Stagiaire, Banque des États de l'Afrique Centrale (BEAC)\\
+M2 Data Science \& IA  ENSPD / Université de Douala, LIDIA Laboratory
+}
+
+\vspace{2cm}
+
+{\normalsize Août 2026}
+
+\vfill
+
+{\small
+Document rédigé dans le cadre du stage de recherche à la Banque des États de l'Afrique Centrale (BEAC),\\
+M2 Data Science \& IA, ENSPD / Université de Douala  LIDIA Laboratory.
+}
+\end{titlepage}
+
+% ── Résumé ───────────────────────────────────────────────────────
+\begin{abstract}
+La détection non supervisée de variations atypiques dans des séries temporelles financières multivariées constitue un problème fondamental pour la surveillance macroprudentielle. Ce document présente un état de l'art exhaustif des architectures d'intelligence artificielle mobilisées à cette fin, depuis les fondations théoriques du cadre variationnel (Kingma \& Welling, 2013 ; An \& Cho, 2015) jusqu'aux hybrides VAE-Transformer les plus récents (T-VAE, 2025 ; SHAPAttenVAE, 2025 ; MAAT, 2025). Chaque contribution est analysée en profondeur sur ses fondements mathématiques, son architecture, sa fonction objectif, ses résultats expérimentaux et ses limites structurelles. Une cartographie transversale identifie trois lacunes non résolues dans la littérature : l'absence d'encodage bidirectionnel dans les espaces latents hybrides, la quantification incomplète de l'incertitude dans les scores d'anomalie, et l'absence d'un score hiérarchique multi-niveaux explicable. Ces lacunes définissent le terrain de contribution d'une nouvelle méthode adaptée au contexte des données monétaires BEAC-CEMAC.
+
+\bigskip
+\noindent\textbf{Mots-clés :} détection d'anomalies, séries temporelles multivariées, autoencodeur variationnel, Transformer, Association Discrepancy, ELBO, BEAC, surveillance macroprudentielle.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ════════════════════════════════════════════════════════════════
+\section{Introduction}
+
+\subsection{Contexte général}
+
+La détection automatique de variations atypiques  ou \textit{anomaly detection}  désigne le processus d'identification de patrons dans des données qui s'écartent statistiquement du comportement attendu (Chandola, Banerjee \& Kumar, 2009 ; Pang et al., 2021). Dans le domaine monétaire et financier, ces variations peuvent signaler des erreurs de collecte de données, des chocs macroéconomiques exogènes, des ruptures structurelles dans les dynamiques de crédit ou de dépôt, ou des comportements frauduleux. Pour une institution comme la Banque des États de l'Afrique Centrale (BEAC), dont la mission est d'assurer la stabilité monétaire dans la zone CEMAC (Communauté Économique et Monétaire de l'Afrique Centrale), la détection précoce et fiable de ces variations constitue une exigence opérationnelle et réglementaire de premier ordre.
+
+Le dataset de référence de ce travail  les séries monétaires des Autres Sociétés de Dépôts (2SR) selon la nomenclature IFS du FMI  présente des caractéristiques structurelles qui en font un terrain d'expérimentation exigeant : environ 195 observations mensuelles (décembre 2001 à mars 2026), environ 55 indicateurs financiers multivariés couvrant l'actif et le passif du bilan des institutions de dépôt du Cameroun, une forte hétérogénéité d'échelles (en milliards de FCFA), des valeurs manquantes sporadiques, une saisonnalité budgétaire marquée et des ruptures structurelles documentées (choc Covid-19 en 2020--2021, dynamique de crédit 2024).
+
+\subsection{Pourquoi le cadre non supervisé ?}
+
+En l'absence d'étiquettes d'anomalies historiquement certifiées par un processus d'audit formalisé, les approches supervisées sont inapplicables directement. Le cadre non supervisé, fondé sur la modélisation de la distribution normale et la détection par déviation, est le seul praticable. Parmi les familles de méthodes disponibles, les architectures profondes à base d'autoencodeurs variationnels (VAE) et de Transformers présentent la cohérence structurelle la plus forte avec les caractéristiques du dataset BEAC, pour trois raisons : leur capacité à modéliser des distributions multivariées complexes sans hypothèses paramétriques fortes ; leur aptitude à capturer les dépendances temporelles à longue portée ; et leur extensibilité vers des scores probabilistes d'anomalie intégrant l'incertitude du modèle.
+
+\subsection{Organisation de ce document}
+
+Ce document est organisé en neuf sections. La section~2 rappelle le cadre théorique fondateur (théorie variationnelle, mécanisme d'attention). Les sections~3, 4 et~5 présentent les analyses techniques approfondies des articles du corpus, organisées en trois axes : fondations, Transformers pour la détection d'anomalies, et hybrides VAE-Transformer. La section~6 couvre les architectures avancées. La section~7 présente la synthèse transversale, la cartographie des lacunes et les pistes de contribution. La section~8 propose le positionnement théorique de la méthode BiVAT. La section~9 analyse la cohérence avec le dataset BEAC.
+
+% ════════════════════════════════════════════════════════════════
+\section{Cadre Théorique Fondateur}
+
+\subsection{Inférence variationnelle et ELBO}
+
+Soit un ensemble d'observations $\mathcal{X} = \{\mathbf{x}^{(i)}\}_{i=1}^{N}$ généré par un processus impliquant une variable latente non observée $\mathbf{z} \in \mathbb{R}^d$. Le modèle génératif spécifie :
+
+$$p_\theta(\mathbf{x}, \mathbf{z}) = p_\theta(\mathbf{x}|\mathbf{z})\,p(\mathbf{z})$$
+
+La vraisemblance marginale $p_\theta(\mathbf{x}) = \int p_\theta(\mathbf{x}|\mathbf{z})\,p(\mathbf{z})\,d\mathbf{z}$ est intractable dès que $p_\theta(\mathbf{x}|\mathbf{z})$ est un réseau de neurones. L'inférence variationnelle contourne cette intractabilité en introduisant une distribution approchée $q_\phi(\mathbf{z}|\mathbf{x})$ (l'\textit{encodeur}) et en maximisant la borne inférieure de l'évidence (\textit{Evidence Lower BOund}, ELBO) :
+
+$$\log p_\theta(\mathbf{x}) \;\geq\; \mathcal{L}(\theta, \phi;\,\mathbf{x}) = \underbrace{\mathbb{E}_{q_\phi(\mathbf{z}|\mathbf{x})}\!\left[\log p_\theta(\mathbf{x}|\mathbf{z})\right]}_{\text{terme de reconstruction}} - \underbrace{D_{\mathrm{KL}}\!\left(q_\phi(\mathbf{z}|\mathbf{x}) \;\|\; p(\mathbf{z})\right)}_{\text{terme de régularisation KL}}$$
+
+Cette inégalité découle de la décomposition :
+
+$$\log p_\theta(\mathbf{x}) = \mathcal{L}(\theta,\phi;\,\mathbf{x}) + D_{\mathrm{KL}}(q_\phi(\mathbf{z}|\mathbf{x}) \| p_\theta(\mathbf{z}|\mathbf{x}))$$
+
+Maximiser l'ELBO revient donc à minimiser simultanément la divergence KL entre la distribution approximée et la postérieure vraie, et à maximiser la vraisemblance de reconstruction.
+
+\subsection{Le mécanisme d'attention multi-têtes}
+
+Vaswani et al. (2017) proposent l'opération d'auto-attention à produit scalaire (\textit{Scaled Dot-Product Attention}), fondement de toute architecture Transformer :
+
+$$\mathrm{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \mathrm{Softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^\top}{\sqrt{d_k}}\right)\mathbf{V}$$
+
+où $\mathbf{Q} = \mathbf{X}\mathbf{W}_Q$, $\mathbf{K} = \mathbf{X}\mathbf{W}_K$, $\mathbf{V} = \mathbf{X}\mathbf{W}_V$ sont les projections linéaires des séquences d'entrée $\mathbf{X} \in \mathbb{R}^{T \times d_{\mathrm{model}}}$, et $d_k$ est la dimension des clés. L'attention multi-têtes concatène $H$ têtes d'attention parallèles :
+
+$$\mathrm{MHA}(\mathbf{Q},\mathbf{K},\mathbf{V}) = \mathrm{Concat}(\mathrm{head}_1, \ldots, \mathrm{head}_H)\,\mathbf{W}^O$$
+
+La matrice d'attention $\mathbf{A} = \mathrm{Softmax}(\mathbf{Q}\mathbf{K}^\top/\sqrt{d_k}) \in \mathbb{R}^{T\times T}$ encode, pour chaque instant $t$, une distribution de poids sur l'ensemble des instants de la séquence  ce qui constitue la base de l'\textit{Association Discrepancy} explorée à la section~4.
+
+% ════════════════════════════════════════════════════════════════
+\section{Axe 1 Fondations Théoriques}
+
+\subsection{[F1] Kingma \& Welling (2013)  Auto-Encoding Variational Bayes}
+
+\textbf{Problème formel.} Apprendre conjointement une représentation latente compacte et probabiliste $q_\phi(\mathbf{z}|\mathbf{x})$ et un modèle génératif $p_\theta(\mathbf{x}|\mathbf{z})$ de manière non supervisée, en rendant le processus d'optimisation différentiable end-to-end malgré l'opération d'échantillonnage.
+
+\textbf{Architecture et paramétrisation.} L'encodeur paramétrise $q_\phi(\mathbf{z}|\mathbf{x}) = \mathcal{N}(\mathbf{z};\,\boldsymbol{\mu}_\phi(\mathbf{x}),\,\mathrm{diag}(\boldsymbol{\sigma}^2_\phi(\mathbf{x})))$ via deux têtes linéaires distinctes produisant $\boldsymbol{\mu}_\phi$ et $\log\boldsymbol{\sigma}^2_\phi$. Le décodeur paramétrise $p_\theta(\mathbf{x}|\mathbf{z})$, typiquement gaussienne pour les données continues. L'astuce du reparamétrage (\textit{reparameterization trick}) rend l'échantillonnage différentiable :
+
+$$\mathbf{z} = \boldsymbol{\mu}_\phi(\mathbf{x}) + \boldsymbol{\sigma}_\phi(\mathbf{x}) \odot \boldsymbol{\epsilon}, \qquad \boldsymbol{\epsilon} \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$$
+
+Les gradients fluent ainsi librement vers $\boldsymbol{\mu}_\phi$ et $\boldsymbol{\sigma}_\phi$ via la descente de gradient stochastique standard.
+
+\textbf{Terme KL en forme close.} Pour des gaussiennes diagonales, le terme de régularisation admet une expression analytique évitant toute estimation Monte Carlo :
+
+$$D_{\mathrm{KL}}\!\left(\mathcal{N}(\boldsymbol{\mu},\boldsymbol{\sigma}^2) \;\|\; \mathcal{N}(\mathbf{0},\mathbf{I})\right) = -\frac{1}{2}\sum_{j=1}^{d}\left(1 + \log\sigma_j^2 - \mu_j^2 - \sigma_j^2\right)$$
+
+\textbf{Score d'anomalie dérivé (An \& Cho, 2015).} En entraînant le VAE uniquement sur des données normales, la probabilité de reconstruction négative constitue un score d'anomalie naturel :
+
+$$\mathrm{AnoScore}(\mathbf{x}) = -\frac{1}{L}\sum_{\ell=1}^{L}\log p_\theta\!\left(\mathbf{x}\mid\mathbf{z}^{(\ell)}\right), \quad \mathbf{z}^{(\ell)} \sim q_\phi(\mathbf{z}|\mathbf{x})$$
+
+Les $L$ tirages Monte Carlo permettent d'estimer l'incertitude de reconstruction : une forte variance entre les reconstructions $\hat{\mathbf{x}}^{(\ell)}$ est elle-même un signal d'anomalie, indiquant que l'espace latent est peu contraint pour ce point.
+
+\textbf{Limites structurelles pour les séries temporelles.} (1)~Indépendance temporelle : chaque observation est traitée indépendamment, sans modélisation de la dépendance entre $\mathbf{x}_t$ et $\mathbf{x}_{t-k}$. (2)~Postérieure à queue légère : la prior gaussienne standard pénalise les distributions latentes à forte variance, limitant l'expressivité face aux données financières hétéroscédastiques. (3)~Factorisation diagonale de $q_\phi$ : les corrélations entre dimensions latentes sont ignorées.
+
+\textbf{Pertinence pour la méthode cible.} \textit{Fondamentale et indispensable.} L'ELBO, le reparamétrage et le score par probabilité de reconstruction constituent les briques de base de toute l'architecture hybride développée par la suite. Toutes les extensions  OmniAnomaly, T-VAE, notre méthode  sont des dérivations directes de ce cadre.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[F2] An \& Cho (2015)  Variational Autoencoder Based Anomaly Detection Using Reconstruction Probability}
+
+\textbf{Problème formel.} Comment formaliser un critère de décision probabiliste  dépassant la simple erreur quadratique de reconstruction  exploitant la nature stochastique de l'espace latent pour quantifier l'anomalie ?
+
+\textbf{Contribution principale.} An \& Cho formalisent la \textit{reconstruction probability} comme score d'anomalie :
+
+$$p_{\mathrm{rec}}(\mathbf{x}) = \frac{1}{L}\sum_{\ell=1}^{L}\log p_\theta\!\left(\mathbf{x}\mid\mathbf{z}^{(\ell)}\right), \quad \mathbf{z}^{(\ell)} \sim q_\phi(\mathbf{z}|\mathbf{x})$$
+
+Pour $p_\theta(\mathbf{x}|\mathbf{z}) = \mathcal{N}(\hat{\mathbf{x}},\sigma^2\mathbf{I})$, ce score se développe en :
+
+$$p_{\mathrm{rec}}(\mathbf{x}) \approx -\frac{1}{2\sigma^2 L}\sum_{\ell=1}^{L}\left\|\mathbf{x} - \hat{\mathbf{x}}^{(\ell)}\right\|^2 + \mathrm{const}$$
+
+\textbf{Avantage décisif sur l'erreur de reconstruction ponctuelle.} La reconstruction ponctuelle $\|\mathbf{x} - \hat{\mathbf{x}}\|^2$ est déterministe et ignore l'incertitude du modèle. La reconstruction probability intègre cette incertitude : pour un point atypique, les différentes reconstructions $\hat{\mathbf{x}}^{(\ell)}$ à travers les $L$ tirages divergent fortement, amplifiant le signal d'anomalie. Cette propriété est cruciale dans le contexte financier où la même magnitude de déviation peut être normale (période de forte volatilité) ou anormale (régime calme) selon le contexte temporel.
+
+\textbf{Règle de décision.} Un seuil $\tau$ est calibré au $(1-\alpha)$-ième percentile de la distribution empirique de $p_{\mathrm{rec}}$ sur les données d'entraînement (typiquement $\alpha = 0.01$). Un point est déclaré anomalie si $p_{\mathrm{rec}}(\mathbf{x}) < \tau$.
+
+\textbf{Limites.} Application uniquement sur données tabulaires statiques ; le coût Monte Carlo (facteur $L$) est problématique pour l'inférence en temps réel ; absence totale de modélisation des dépendances temporelles.
+
+\textbf{Pertinence.} \textit{Élevée.} La reconstruction probability sera le score d'anomalie de base, étendu au contexte temporel multivarié. Le coût Monte Carlo sera adressé par un encodeur déterministe auxiliaire inspiré de f-AnoGAN (Schlegl et al., 2019). Le seuillage adaptatif sur percentile sera conservé.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[F3] Su et al. (2019, KDD)  OmniAnomaly}
+
+\textbf{Problème formel.} Détecter des anomalies dans des séries temporelles multivariées $\mathbf{X} = \{\mathbf{x}_1,\ldots,\mathbf{x}_T\} \in \mathbb{R}^{T \times D}$ issues de systèmes complexes, en tenant compte simultanément des dépendances temporelles séquentielles et des corrélations inter-dimensions.
+
+\textbf{Architecture : GRU-VAE stochastique (VRNN).} OmniAnomaly est un réseau de neurones récurrent stochastique qui couple GRU et VAE, dont l'idée centrale est de capturer les patterns normaux des séries temporelles multivariées via des représentations robustes, de reconstruire les données depuis ces représentations et d'utiliser les probabilités de reconstruction comme critère d'anomalie.
+
+\textit{Encodeur (inférence) :}
+$$\mathbf{h}^e_t = \mathrm{GRU}_\phi^e(\mathbf{x}_t,\,\mathbf{h}^e_{t-1})$$
+$$\boldsymbol{\mu}^e_t,\,\boldsymbol{\sigma}^e_t = \mathrm{MLP}_\phi(\mathbf{h}^e_t)$$
+$$\mathbf{z}_t = \boldsymbol{\mu}^e_t + \boldsymbol{\sigma}^e_t \odot \boldsymbol{\epsilon}_t, \quad \boldsymbol{\epsilon}_t \sim \mathcal{N}(\mathbf{0},\mathbf{I})$$
+
+\textit{Décodeur (génération) :}
+$$\mathbf{h}^d_t = \mathrm{GRU}_\theta^d(\mathbf{z}_t,\,\mathbf{h}^d_{t-1})$$
+$$\hat{\mathbf{x}}_t = \mathrm{MLP}_\theta(\mathbf{h}^d_t)$$
+
+\textit{Prior temporelle conditionnelle (innovation centrale) :}
+$$p(\mathbf{z}_t | \mathbf{z}_{t-1}) = \mathcal{N}\!\left(\mathbf{z}_t;\;\boldsymbol{\mu}^p_t(\mathbf{h}^d_{t-1}),\;\boldsymbol{\sigma}^p_t(\mathbf{h}^d_{t-1})\right)$$
+
+Cette prior conditionnelle est l'innovation architecturale majeure d'OmniAnomaly par rapport au VAE standard : elle encode la cohérence temporelle attendue dans l'espace latent. La prior n'est plus la gaussienne standard isotrope $\mathcal{N}(\mathbf{0},\mathbf{I})$ mais dépend de l'état caché précédent, forçant le modèle à apprendre une dynamique temporelle dans l'espace latent.
+
+\textbf{Fonction objectif (ELBO séquentiel) :}
+$$\mathcal{L}_{\mathrm{OmniAnomaly}} = \sum_{t=1}^T\!\left[\mathbb{E}_{q_\phi}\!\left[\log p_\theta(\mathbf{x}_t|\mathbf{z}_t)\right] - D_{\mathrm{KL}}\!\left(q_\phi(\mathbf{z}_t|\mathbf{x}_{\leq t})\;\|\;p(\mathbf{z}_t|\mathbf{z}_{t-1})\right)\right]$$
+
+\textbf{Score d'anomalie :}
+$$s_t = -\frac{1}{K}\sum_{k=1}^K\log p_\theta\!\left(\mathbf{x}_t\mid\mathbf{z}_t^{(k)}\right), \quad \mathbf{z}_t^{(k)} \sim q_\phi(\mathbf{z}_t|\mathbf{x}_{\leq t})$$
+
+\textbf{Résultats expérimentaux.} OmniAnomaly atteint un F1-score global de 0.86 sur trois datasets réels (SMAP, MSL, SMD), surpassant la meilleure méthode de l'état de l'art de l'époque par 0.09, avec une précision d'interprétation des anomalies allant jusqu'à 0.89.
+
+\textbf{Limites identifiées.} (1)~\textit{Fenêtre de contexte limitée par le GRU} : pour $T > 50$ pas de temps, l'information ancienne s'estompe progressivement par oubli. (2)~\textit{Traitement séquentiel} : le GRU interdit la parallélisation sur GPU, rendant l'entraînement lent. (3)~\textit{Absence d'attention globale} : les corrélations inter-temporelles distantes ne sont pas explicitement capturées.
+
+\textbf{Pertinence.} \textit{Élevée  référence architecturale directe.} Deux éléments sont réutilisables : la prior temporelle conditionnelle (adaptable dans un espace latent Transformer) et le score d'anomalie par reconstruction probabiliste séquentielle. Le GRU sera remplacé par un encodeur Transformer.
+
+% ════════════════════════════════════════════════════════════════
+\section{Axe 2 Transformers pour la Détection d'Anomalies}
+
+\subsection{[T1] Xu et al. (2022, ICLR Spotlight)  Anomaly Transformer}
+
+\textbf{Problème formel et observation fondatrice.} La détection non supervisée de points anomaux dans les séries temporelles est un problème difficile, qui exige du modèle qu'il dérive un critère distinctif. Les méthodes précédentes traitent le problème principalement par apprentissage de représentations point-à-point ou d'associations par paires, mais ni l'une ni l'autre ne suffit à raisonner sur les dynamiques complexes.
+
+L'intuition centrale est la suivante : en raison de la rareté des anomalies, il est extrêmement difficile de construire des associations non triviales depuis les points anomaux vers l'ensemble de la série ; les associations des anomalies se concentrent donc principalement sur leurs points temporels adjacents. Ce biais de concentration adjacente implique un critère discriminant inhérent entre points normaux et anormaux.
+
+\textbf{Association Discrepancy  Formalisation.} Pour chaque couche $\ell$ et chaque instant $t$, deux distributions d'association sont maintenues.
+
+\textit{Prior Association}  distribution gaussienne centrée sur $t$, modélisant la tendance naturelle à concentrer l'attention localement :
+$$\mathcal{P}^{(\ell)}_t(i) = \frac{1}{\sqrt{2\pi}\sigma^{(\ell)}}\exp\!\left(-\frac{(i-t)^2}{2(\sigma^{(\ell)})^2}\right), \quad i \in \{1,\ldots,T\}$$
+où $\sigma^{(\ell)}$ est un paramètre appris par couche.
+
+\textit{Series Association}  distribution d'attention apprise depuis les données :
+$$\mathcal{S}^{(\ell)} = \mathrm{Softmax}\!\left(\frac{\mathbf{Q}^{(\ell)}{\mathbf{K}^{(\ell)}}^\top}{\sqrt{d_k}}\right)$$
+
+\textit{Association Discrepancy} (divergence KL symétrique, agrégée sur $L$ couches et $T$ instants) :
+$$\mathrm{AssDis}^{(\ell)}(\mathbf{X}) = \frac{1}{T}\sum_{t=1}^{T}\!\left[\mathrm{KL}\!\left(\mathcal{P}^{(\ell)}_t \;\|\; \mathcal{S}^{(\ell)}_t\right) + \mathrm{KL}\!\left(\mathcal{S}^{(\ell)}_t \;\|\; \mathcal{P}^{(\ell)}_t\right)\right]$$
+
+\textbf{Stratégie d'entraînement minimax.} L'objectif est un jeu à deux phases qui crée une tension productive.
+
+\textit{Phase Maximize}  amplifier la discordance, forçant les points normaux à exhiber une forte divergence $\mathcal{P}$ vs $\mathcal{S}$ :
+$$\min_{\theta,\sigma}\left\|\mathbf{X} - \hat{\mathbf{X}}\right\|_F^2 - \lambda\cdot\mathrm{AssDis}(\mathbf{X})$$
+
+\textit{Phase Minimize}  reconverger les associations :
+$$\min_{\theta,\sigma}\left\|\mathbf{X} - \hat{\mathbf{X}}\right\|_F^2 + \lambda\cdot\mathrm{AssDis}(\mathbf{X})$$
+
+Cette tension crée un signal discriminant : après entraînement, les anomalies affichent une Association Discrepancy plus faible (confinées à des associations locales), les points normaux une Discrepancy plus élevée (associations distribuées).
+
+\textbf{Score d'anomalie final :}
+$$\mathrm{AnoScore}(t) = \mathrm{Softmax}\!\left(-\mathrm{AssDis}^{(1:L)}_t\right)\cdot\left\|\mathbf{x}_t - \hat{\mathbf{x}}_t\right\|_2$$
+
+\textbf{Architecture complète.} Stack de $L = 3$ blocs Transformer modifiés, chacun calculant simultanément $\mathcal{P}^{(\ell)}$ et $\mathcal{S}^{(\ell)}$, avec embedding positionnel sinusoïdal. La complexité est $\mathcal{O}(T^2 d)$ due à l'attention standard.
+
+\textbf{Résultats.} Évalué sur cinq benchmarks (SMD, MSL, SMAP, SWaT, PSM), l'Anomaly Transformer surpasse l'état de l'art, avec des gains en F1-score de 3 à 10 points.
+
+\textbf{Limites pour notre contexte.} (1)~Absence de composante probabiliste : score déterministe, pas d'intervalle de confiance. (2)~Encodeur causal uniquement : l'attention masquée ignore l'information future. (3)~Score scalaire unique : pas de distinction anomalie ponctuelle / contextuelle / collective. (4)~Complexité $\mathcal{O}(T^2)$ non problématique pour 195 observations mais limitante sur des fréquences plus élevées.
+
+\textbf{Pertinence.} \textit{Très élevée  composante centrale.} L'Association Discrepancy sera intégrée dans notre architecture. La stratégie minimax sera adaptée à un cadre variationnel où la reconstruction est probabiliste plutôt que déterministe.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[T2] Tuli, Casale \& Jennings (2022, VLDB)  TranAD}
+
+\textbf{Problème formel.} Réaliser simultanément la détection et le diagnostic d'anomalies dans des données temporelles multivariées, dans un cadre Transformer unique, à inférence rapide, robuste face à la multi-modalité des données, en présence de labels absents et de forte volatilité des données.
+
+\textbf{Architecture : deux décodeurs antagonistes.} TranAD propose un réseau Transformer profond utilisant des encodeurs de séquences basés sur l'attention pour effectuer une inférence rapide avec la connaissance des tendances temporelles globales, un auto-conditionnement basé sur le score de focalisation pour permettre une extraction robuste de caractéristiques multi-modales, et un entraînement adversarial pour gagner en stabilité.
+
+\textit{Encodeur partagé :}
+$$\mathbf{H} = \mathrm{TransformerEncoder}(\mathbf{X}_{t-W:t}) \in \mathbb{R}^{W \times d_{\mathrm{model}}}$$
+
+\textit{Décodeur 1  reconstruction initiale :}
+$$\hat{\mathbf{X}}^{(1)} = \mathcal{D}_1(\mathbf{H})$$
+
+\textit{Focus score  score de première passe :}
+$$\mathbf{f}^{(1)}_t = \left\|\mathbf{x}_t - \hat{\mathbf{x}}^{(1)}_t\right\|_1 \in \mathbb{R}^D$$
+
+\textit{Auto-conditionnement  décodeur 2 conditionné :}
+$$\hat{\mathbf{X}}^{(2)} = \mathcal{D}_2(\mathbf{H},\,\mathbf{f}^{(1)})$$
+
+Ce conditionnement sur le focus score permet au décodeur 2 de focaliser sa reconstruction sur les dimensions identifiées comme potentiellement anormales lors de la première passe, amplifiant le signal d'anomalie.
+
+\textbf{Fonction objectif adversariale.} Avec $n$ l'indice d'époque :
+$$\mathcal{L} = \frac{1}{n}\,\mathcal{L}^{(1)} + \left(1 - \frac{1}{n}\right)\mathcal{L}^{(2)}$$
+où $\mathcal{L}^{(i)} = \frac{1}{W}\sum_t\|\mathbf{x}_t - \hat{\mathbf{x}}^{(i)}_t\|_2^2$.
+
+\textbf{Résultats.} Sur six datasets, TranAD améliore les F1-scores jusqu'à 17\% et réduit les temps d'entraînement jusqu'à 99\% par rapport aux méthodes de référence.
+
+\textbf{Pertinence.} \textit{Élevée  mécanisme de focus score transposable.} Le score d'anomalie probabiliste du VAE ($p_{\mathrm{rec}}$) peut servir de signal de conditionnement pour un second décodeur Transformer, créant une boucle d'amplification intégrée dans notre architecture.
+
+% ════════════════════════════════════════════════════════════════
+\section{Axe 3 Hybrides VAE-Transformer}
+
+\subsection{[H1] Song, Seo \& Kim (2023, IEEE Access)  Anomaly VAE-Transformer}
+
+\textbf{Problème formel.} Les séries temporelles financières (protocoles DeFi) présentent des anomalies à deux échelles distinctes : des pics ponctuels (flash crashes) détectables localement par le VAE, et des dérives progressives (shifts de régime) détectables seulement sur de longs horizons via le Transformer. Aucun modèle seul n'adresse efficacement les deux niveaux.
+
+\textbf{Architecture à double branche.} L'article propose deux branches parallèles indépendantes.
+
+\textit{Branche locale  VAE} : encode chaque fenêtre glissante $\mathbf{w}_t = \mathbf{x}_{t-W:t}$ et produit un score local $s^{\mathrm{VAE}}_t = -\log p_\theta(\mathbf{w}_t|\mathbf{z}_t)$.
+
+\textit{Branche globale  Transformer} : auto-attention complète sur la séquence entière, produisant une reconstruction et un score global $s^{\mathrm{Tr}}_t = \|\mathbf{x}_t - \hat{\mathbf{x}}^{\mathrm{Tr}}_t\|_2$.
+
+\textit{Fusion des scores par pondération apprise :}
+$$s_t^{\mathrm{final}} = \alpha\,s^{\mathrm{VAE}}_t + (1-\alpha)\,s^{\mathrm{Tr}}_t, \quad \alpha \in [0,1]\text{ appris}$$
+
+\textbf{Résultats.} Sur données DeFi (Uniswap, Aave) : F1 = 91.3\% contre 87.2\% pour le VAE seul et 88.9\% pour le Transformer seul.
+
+\textbf{Limite fondamentale.} L'intégration est \textit{superficielle} : VAE et Transformer opèrent dans des espaces distincts, leurs gradients ne s'informent pas mutuellement pendant l'entraînement. La fusion est une simple pondération de scalaires, non une intégration dans l'espace de représentation.
+
+\textbf{Pertinence.} \textit{Modérée  validation du principe, architecture insuffisante.} Ce papier valide empiriquement l'intérêt de la complémentarité locale/globale VAE+Transformer, mais notre méthode visera une intégration profonde dans l'espace latent.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[H2] Li et al. (2025, Expert Systems)  T-VAE}
+
+\textbf{Problème formel.} La détection d'anomalies dans des données de séries temporelles multivariées dont les dépendances séquentielles  ordre temporel et relations entre dimensions  sont complexes et non linéaires, et dont les données présentent une forte volatilité entrecoupée de bruit.
+
+\textbf{Architecture : intégration profonde Transformer-dans-VAE.} Le T-VAE consiste en deux sous-réseaux  le Réseau de Représentation et le Réseau Mémoire  et atteint une optimisation conjointe end-to-end. Le Réseau de Représentation exploite des mécanismes d'auto-attention et des structures résiduelles pour capturer l'information séquentielle et les patterns profonds des données multivariées. Le Réseau Mémoire emploie un autoencodeur variationnel pour apprendre la distribution des données normales.
+
+Contrairement aux hybrides à deux blocs séquentiels comme [H1], le T-VAE réalise une intégration \textit{interne} : le Transformer enrichit directement la représentation latente du VAE.
+
+\textit{Encodeur Transformer-VAE (étape par étape).}
+
+Étape 1  Embedding et encodage positionnel :
+$$\mathbf{E}_t = \mathrm{EmbedLayer}(\mathbf{x}_t) + \mathrm{PE}(t) \in \mathbb{R}^{d_{\mathrm{model}}}$$
+
+Étape 2  Blocs Transformer ($L$ couches) :
+$$\mathbf{H}^{(L)} = \mathrm{TransformerEncoder}^{(1:L)}(\mathbf{E}) \in \mathbb{R}^{T \times d_{\mathrm{model}}}$$
+
+Étape 3  Projection variationnelle sur les représentations contextuelles :
+$$\boldsymbol{\mu}_t = \mathbf{W}_\mu\,\mathbf{H}^{(L)}_t + \mathbf{b}_\mu, \qquad \log\boldsymbol{\sigma}^2_t = \mathbf{W}_\sigma\,\mathbf{H}^{(L)}_t + \mathbf{b}_\sigma$$
+
+Ainsi, $(\boldsymbol{\mu}_t, \boldsymbol{\sigma}_t)$ intègrent l'information contextuelle \textit{globale} de toute la séquence via les couches Transformer, avant la projection variationnelle. C'est l'intégration profonde : le Transformer ne produit pas un score séparé, il enrichit directement l'espace latent du VAE.
+
+\textit{Reparamétrage et décodage :}
+$$\mathbf{z}_t = \boldsymbol{\mu}_t + \boldsymbol{\sigma}_t \odot \boldsymbol{\epsilon}_t$$
+$$\hat{\mathbf{x}}_t = \mathrm{TransformerDecoder}_\theta(\mathbf{z}_t,\,\mathbf{H}^{(L)})$$
+
+\textbf{Fonction objectif avec KL Annealing :}
+$$\mathcal{L}_{\mathrm{T-VAE}} = \sum_{t=1}^T\left[\mathbb{E}_{q_\phi}\!\left[\log p_\theta(\mathbf{x}_t|\mathbf{z}_t)\right] - \beta_t\,D_{\mathrm{KL}}\!\left(q_\phi(\mathbf{z}_t|\mathbf{x}) \;\|\; \mathcal{N}(\mathbf{0},\mathbf{I})\right)\right]$$
+
+Le coefficient $\beta_t$ est progressivement annealed de 0 à 1 pendant l'entraînement, évitant l'effondrement du posterior (\textit{posterior collapse}).
+
+\textbf{Score d'anomalie :}
+$$s_t = -\frac{1}{L}\sum_{\ell=1}^L\log p_\theta\!\left(\mathbf{x}_t\mid\mathbf{z}^{(\ell)}_t\right) + \gamma\,D_{\mathrm{KL}}(q_\phi(\mathbf{z}_t|\mathbf{x})\;\|\;\mathcal{N}(\mathbf{0},\mathbf{I}))$$
+
+\textbf{Résultats.} Performances supérieures sur cinq datasets, validées par des études d'ablation et des analyses de sensibilité exhaustives. Gains de 3--6 points sur les hybrides à fusion superficielle comme [H1].
+
+\textbf{Pertinence.} \textit{Très élevée  architecture la plus proche de la nôtre.} Le T-VAE définit l'architecture de référence. Nos contributions porteront sur : (i) un encodeur bidirectionnel (le T-VAE est causal), (ii) l'intégration de l'Association Discrepancy dans la fonction objectif, (iii) un score d'anomalie multi-niveaux dépassant le score scalaire.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[H3] Wang et al. (2022, Measurement)  Variational Transformer-based Anomaly Detection}
+
+\textbf{Problème formel.} Formaliser l'intégration de la stochasticité variationnelle \textit{au sein} du flux d'attention du Transformer, non en aval, afin d'obtenir des distributions d'attention incertaines directement interprétables.
+
+\textbf{Architecture : couche d'attention variationnelle.} La modification centrale remplace le calcul déterministe de l'attention par une formulation stochastique. Dans chaque couche, après le calcul de $\mathrm{Softmax}(\mathbf{QK}^\top/\sqrt{d_k})$, un réseau MLP produit $\boldsymbol{\mu}_{\mathrm{attn}}$ et $\boldsymbol{\sigma}_{\mathrm{attn}}$, permettant d'échantillonner :
+$$\mathbf{z}_{\mathrm{attn}} \sim \mathcal{N}(\boldsymbol{\mu}_{\mathrm{attn}},\,\mathrm{diag}(\boldsymbol{\sigma}^2_{\mathrm{attn}}))$$
+
+La représentation cachée devient $\mathbf{H} = \mathbf{z}_{\mathrm{attn}}\,\mathbf{V}$, injectant la stochasticité directement dans le mécanisme d'attention.
+
+\textbf{Score d'anomalie :}
+$$s_t = -\log p_\theta(\mathbf{x}_t|\mathbf{z}_{\mathrm{attn},\leq t}) + \lambda\,D_{\mathrm{KL}}(\mathcal{N}(\boldsymbol{\mu}_{\mathrm{attn},t},\boldsymbol{\sigma}^2_{\mathrm{attn},t})\|\mathcal{N}(\mathbf{0},\mathbf{I}))$$
+
+\textbf{Résultats.} F1 = 88.4\% sur SWaT, comparé favorablement à OmniAnomaly et à l'Anomaly Transformer.
+
+\textbf{Pertinence.} \textit{Élevée  inspiration architecturale.} L'idée d'injecter la stochasticité \textit{dans} le mécanisme d'attention ouvre la voie à des distributions d'attention incertaines interprétables comme des distributions sur les associations temporelles, enrichissant l'Association Discrepancy de l'Anomaly Transformer.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[H4] Zhang et al. (2021, CCDC)  Transformer-based VAE Non Supervisé}
+
+\textbf{Positionnement historique.} Ce travail précurseur (2021) est le premier à proposer explicitement le remplacement des couches GRU de l'encodeur d'OmniAnomaly par des blocs d'attention multi-têtes, constituant le premier Transformer-VAE pour la détection d'anomalies non supervisée dans les séries multivariées.
+
+\textbf{Architecture.} L'encodeur Transformer remplace le GRU d'OmniAnomaly via une opération de self-attention avec connexion résiduelle :
+$$\mathbf{H} = \mathrm{MultiHeadAttn}(\mathbf{X}, \mathbf{X}, \mathbf{X}) + \mathbf{X}$$
+$$\boldsymbol{\mu}_t,\,\boldsymbol{\sigma}_t = \mathrm{MLP}(\mathbf{H}_t)$$
+
+Le décodeur reste un LSTM, conservé d'OmniAnomaly pour la génération séquentielle. Ce choix hybride (encodeur Transformer + décodeur LSTM) constitue une étape de transition architecturale.
+
+\textbf{Contribution.} Gains de 2--5 points de F1 sur OmniAnomaly sur SMD et MSL, validant empiriquement que le remplacement GRU $\rightarrow$ Transformer améliore la capture des dépendances longue portée dans l'espace latent.
+
+\textbf{Pertinence.} \textit{Élevée  pont historique essentiel.} Ce travail est la référence pour justifier la progression OmniAnomaly $\rightarrow$ Transformer-VAE dans la narration bibliographique de notre méthode.
+
+% ════════════════════════════════════════════════════════════════
+\section{Axe 4 Architectures Avancées}
+
+\subsection{[A1] He et al. (2024, Information Sciences)  VAEAT}
+
+\textbf{Problème formel.} Les données d'entraînement d'un VAE peuvent être contaminées par des anomalies non étiquetées (\textit{unlabeled anomalies}), dégradant la qualité de reconstruction sur les données normales. Comment rendre le VAE robuste à cette contamination via un entraînement adversarial ?
+
+\textbf{Architecture : deux VAE hybrides LSTM+Attention.}
+
+\textit{Encodeur hybride (partagé) :}
+$$\mathbf{h}^{\mathrm{LSTM}}_t = \mathrm{LSTM}_\phi(\mathbf{x}_t,\,\mathbf{h}^{\mathrm{LSTM}}_{t-1})$$
+$$\mathbf{h}^{\mathrm{attn}}_t = \mathrm{MultiHeadAttn}(\mathbf{h}^{\mathrm{LSTM}},\mathbf{h}^{\mathrm{LSTM}},\mathbf{h}^{\mathrm{LSTM}})_t$$
+$$\tilde{\mathbf{h}}_t = \mathrm{LayerNorm}(\mathbf{h}^{\mathrm{LSTM}}_t + \mathbf{h}^{\mathrm{attn}}_t)$$
+
+\textbf{Stratégie d'entraînement en deux phases.} Phase 1 : deux VAE enrichis reconstituent les données brutes. Phase 2 : un discriminateur $\mathcal{D}$ distingue les résidus normaux des résidus d'anomalies via une perte adversariale. La perte totale :
+$$\mathcal{L}_{\mathrm{VAEAT}} = \mathcal{L}^{(1)}_{\mathrm{ELBO}} + \mathcal{L}^{(2)}_{\mathrm{ELBO}} + \lambda\,\mathcal{L}_{\mathrm{adv}}$$
+
+\textbf{Score d'anomalie :}
+$$s_t = \alpha\,s^{(1)}_t + (1-\alpha)\,s^{(2)}_t + \beta\,(1-\mathcal{D}(\mathbf{r}_t))$$
+
+\textbf{Pertinence.} \textit{Élevée  robustesse par adversarial training.} La stratégie d'entraînement en deux phases est directement adaptable pour renforcer la robustesse aux anomalies non étiquetées dans le dataset BEAC (chocs exogènes non documentés de la période COVID-19).
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[A2] Xie et al. (2025, ACM/CMC)  Enhanced VAE-Transformer Framework (VLT-Anomaly)}
+
+\textbf{Problème formel.} Les méthodes traditionnelles font face à des défis lors du traitement des séries temporelles, tels que des capacités d'extraction de caractéristiques limitées, une mauvaise gestion des dépendances temporelles, et des performances temps réel sous-optimales.
+
+\textbf{Trois limitations systématiques identifiées dans les architectures existantes.} (1)~Absence de dépendances bidirectionnelles : les encodeurs Transformer causaux ne peuvent pas exploiter l'information future. (2)~Dépendances à long terme insuffisantes, malgré l'attention. (3)~Détection à grain unique, sans différenciation ponctuelle/contextuelle/collective.
+
+\textbf{Solutions proposées dans VLT-Anomaly.}
+
+\textit{Encodeur VAE étendu avec hyperparamètre sur le terme KL} : les auteurs introduisent des hyperparamètres pour contrôler le poids du terme de divergence KL dans l'ELBO, améliorant ainsi la décorrélation des représentations de l'encodeur.
+
+\textit{Module de prédiction combinant Transformer et BiLSTM} : le Transformer capture l'information globale et supporte le calcul parallèle ; le BiLSTM améliore la capacité de modélisation bidirectionnelle. Leur combinaison améliore la représentation et l'efficacité d'entraînement.
+
+\textit{Score d'anomalie par moyennage prédiction-reconstruction} : l'erreur de reconstruction est calculée en moyennant les résultats prédits et la reconstruction du décodeur, et les anomalies sont détectées par recherche du seuil optimal.
+
+\textbf{Pertinence.} \textit{Très élevée  définit les lacunes cibles.} VLT-Anomaly confirme que l'hybridation VAE-Transformer est bénéfique mais que la bidirectionnalité et la détection multi-niveaux restent des problèmes ouverts.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[A3] Zhang et al. (2025, Engineering Applications of AI)  SHAPAttenVAE}
+
+\textbf{Problème formel.} Comment rendre explicable chaque décision d'anomalie d'un VAE, en identifiant quantitativement quelles dimensions et quels pas de temps contribuent le plus au score, dans un cadre réglementaire exigeant l'auditabilité ?
+
+\textbf{Architecture et mécanisme d'explicabilité.} SHAPAttenVAE est un modèle VAE inter-couche explicable qui combine les valeurs SHAP avec un mécanisme d'attention multi-têtes. Il intègre SHAPNETs pour restructurer les autoencodeurs variationnels et quantifier les contributions des nœuds d'une couche à l'autre. Il utilise l'attention multi-têtes pour adresser la limitation des VAE en capture des dépendances à long terme.
+
+Les \textit{poids d'attention inter-couches} indiquent l'importance de chaque dimension $d$ à la couche $\ell$ pour le point $t$ :
+$$\boldsymbol{\alpha}^{(\ell)}_t = \mathrm{Softmax}(\mathbf{W}^{(\ell)}\,\mathbf{h}^{(\ell-1)}_t) \in \mathbb{R}^D$$
+
+Les \textit{valeurs SHAP locales} mesurent la contribution marginale de chaque dimension à la décision d'anomalie :
+$$\phi_d(\mathbf{x}_t) = \sum_{S \subseteq \mathcal{D}\setminus\{d\}}\frac{|S|!\,(D-|S|-1)!}{D!}\left[s(\mathbf{x}_{S\cup\{d\}}) - s(\mathbf{x}_S)\right]$$
+
+Une perte de cohérence force les poids d'attention à être proportionnels aux valeurs SHAP normalisées :
+$$\mathcal{L}_{\mathrm{expl}} = \sum_t\left\|\boldsymbol{\alpha}_t - \hat{\boldsymbol{\phi}}_t\right\|_2^2$$
+
+\textbf{Résultats.} Les résultats expérimentaux sur plusieurs grands datasets démontrent que SHAPAttenVAE surpasse les modèles existants en précision et en robustesse, s'établissant comme un cadre efficace et interprétable.
+
+\textbf{Pertinence.} \textit{Très élevée  exigence réglementaire BEAC.} Dans le contexte COBAC/BEAC, la capacité à produire une explication du type « l'anomalie du mois $t$ est attribuée à 67\% à la série \texttt{Crédits\_ENF} et 22\% à \texttt{Dépôts\_transf} » est une exigence de traçabilité algorithmique non négociable.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[A4] Sellam et al. (2025, ScienceDirect)  MAAT : Mamba Adaptive Anomaly Transformer}
+
+\textbf{Problème formel.} L'attention standard a une complexité $\mathcal{O}(T^2)$. Pour des séries très longues ou en inférence temps réel, cette complexité est prohibitive. Comment conserver la qualité de modélisation des dépendances longue portée avec une complexité linéaire ?
+
+\textbf{Mamba : State Space Model sélectif.} Mamba est un modèle d'état discret à sélectivité adaptative. Pour une séquence $\mathbf{u}_t \in \mathbb{R}^D$ :
+$$\mathbf{h}_t = \bar{\mathbf{A}}\,\mathbf{h}_{t-1} + \bar{\mathbf{B}}\,\mathbf{u}_t, \qquad \mathbf{y}_t = \mathbf{C}\,\mathbf{h}_t$$
+où $\bar{\mathbf{A}}$ et $\bar{\mathbf{B}}$ sont les matrices de transition discrétisées avec un pas $\Delta(\mathbf{u}_t)$ \textit{input-dépendant}. Cette sélectivité permet à Mamba de décider dynamiquement quelle information passée retenir dans l'état caché.
+
+\textbf{Architecture MAAT.} MAAT présente deux innovations clés : une Sparse Attention qui capture les dépendances longue portée en se concentrant sélectivement sur les instants temporels pertinents, réduisant la redondance computationnelle ; et un Mamba-SSM intégré dans le module de reconstruction, avec une connexion saut reliant la reconstruction originale à la sortie Mamba-SSM, fusionnées par un mécanisme de Gated Attention adaptatif.
+
+\textbf{Pertinence.} \textit{Modérée  optimisation potentielle.} Pour 195 observations mensuelles BEAC, la complexité quadratique n'est pas un problème pratique. Si la méthode doit être déployée sur des fréquences journalières ou hebdomadaires, Mamba constitue une optimisation architecturale directement intégrable en variante de l'encodeur.
+
+% ════════════════════════════════════════════════════════════════
+\section{Synthèse Transversale et Cartographie des Lacunes}
+
+\subsection{Tableau de synthèse technique comparatif}
+
+\begin{longtable}{>{\small}p{3.5cm} >{\small}p{2.8cm} >{\small}p{3.2cm} >{\small}p{3.0cm} >{\small}p{1.8cm}}
+\toprule
+\textbf{Article} & \textbf{Architecture} & \textbf{Mécanisme clé} & \textbf{Limite principale} & \textbf{Pert.} \\
+\midrule
+\endhead
+Kingma \& Welling (2013) & VAE & ELBO, reparamétrage & Pas de temporalité & Fond. \\
+An \& Cho (2015) & VAE & Prob. de reconstruction & Données statiques & Élevée \\
+Su et al. (2019) & GRU-VAE & Prior temp. cond. & GRU, pas attn globale & Élevée \\
+Xu et al. (2022) & Transformer & AssDis + minimax & Pas de stochasticité & T. élevée \\
+Tuli et al. (2022) & Transformer$\times$2 & Focus score + advers. & Pas de VAE & Élevée \\
+Song et al. (2023) & VAE $\|$ Transformer & Fusion scores loc./glob. & Intégr. superficielle & Modérée \\
+Wang et al. (2022) & Var. Transformer & Attention stochastique & Complexité, causal & Élevée \\
+Zhang et al. (2021) & Transformer-VAE & Encodeur Transformer & Décodeur LSTM & Élevée \\
+He et al. (2024) & LSTM+Attn-VAE$\times$2 & Adversarial 2 phases & LSTM, pas Tr. pur & Élevée \\
+Li et al. (2025) & T-VAE & Intégration profonde & Causal, score scalaire & T. élevée \\
+Xie et al. (2025) & Enhanced VAE-Tr. & Bidir., KL contrôlé & Score non hiérar. & T. élevée \\
+SHAPAttenVAE (2025) & VAE+Attention & SHAP inter-couches & Coût SHAP & T. élevée \\
+MAAT (2025) & Mamba+Transformer & SSM sélectif $\mathcal{O}(T)$ & Approx. AssDis & Modérée \\
+\bottomrule
+\end{longtable}
+
+\subsection{Cartographie des trois lacunes structurelles}
+
+L'analyse transversale du corpus révèle trois lacunes complémentaires et structurellement liées, que la littérature existante n'a pas encore comblées simultanément dans un cadre unifié.
+
+\subsubsection{Lacune L1 Intégration profonde avec bidirectionnalité}
+
+Les hybrides à fusion superficielle ([H1]) ne permettent pas l'enrichissement mutuel des représentations VAE et Transformer. Le T-VAE ([H2]) réalise une intégration profonde mais demeure \textit{causal} : l'encodeur Transformer utilise une attention masquée, ne pouvant intégrer l'information future $\mathbf{x}_{t+1:T}$ dans la distribution latente $q_\phi(\mathbf{z}_t|\mathbf{x})$. Or, dans le cadre d'un processus de vérification a posteriori (audit mensuel à la BEAC), l'ensemble de la série est disponible : une attention \textit{non causale} (bidirectionnelle, de type BERT) produirait des représentations latentes plus informées. VLT-Anomaly (2025) propose le principe mais sans formaliser la modification de la fonction objectif résultante.
+
+Une méthode originale devra donc proposer un encodeur VAE-Transformer \textit{non causal} avec une fonction objectif intégrant à la fois l'ELBO variationnel et l'Association Discrepancy. La non-causalité modifie substantiellement l'ELBO : la distribution postérieure $q_\phi(\mathbf{z}_t|\mathbf{x})$ intègre désormais l'information $\mathbf{x}_{t+1:T}$, ce qui améliore la précision de l'encodage aux points de rupture, mais exige une reformulation de la prior temporelle conditionnelle pour tenir compte de ce contexte futur.
+
+\subsubsection{Lacune L2 Quantification de l'incertitude en temps réel}
+
+L'Anomaly Transformer ([T1]) et TranAD ([T2]) produisent des scores d'anomalie déterministes, sans intervalle de confiance. Le VAE offre naturellement une quantification probabiliste via l'espace latent stochastique, mais les hybrides existants n'exploitent pas pleinement cette propriété dans le score final. SHAPAttenVAE utilise des tirages Monte Carlo uniquement pour les valeurs SHAP, pas pour construire un intervalle de confiance sur le score d'anomalie lui-même.
+
+Dans le contexte BEAC, cette lacune a une implication opérationnelle directe : un superviseur prudentiel a besoin non seulement d'un score scalaire indiquant « cette observation est anormale » mais aussi d'une mesure de la \textit{certitude du modèle} dans cette décision. Une méthode produisant des intervalles de confiance de la forme $s_t \pm 2\sigma_{s_t}$ permettrait de distinguer les anomalies à haute confiance (à signaler immédiatement) des anomalies à faible confiance (à mettre sous surveillance).
+
+\subsubsection{Lacune L3 Score d'anomalie multi-niveaux explicable}
+
+Tous les modèles existants produisent un score scalaire unique. Or, les anomalies en série temporelle financière sont de nature hétérogène : (a)~les \textit{anomalies ponctuelles} (un seul instant $t$ aberrant, e.g. une erreur de saisie dans les statistiques de dépôts) ; (b)~les \textit{anomalies contextuelles} (un point dont la valeur absolue est normale mais qui s'écarte de son contexte local) ; (c)~les \textit{anomalies collectives} (une sous-séquence entière anormale, e.g. un choc de financement externe affectant plusieurs séries sur plusieurs mois).
+
+Distinguer ces trois types permet au superviseur de calibrer sa réponse : une anomalie ponctuelle peut indiquer une erreur de collecte ; une anomalie contextuelle peut signaler un changement de comportement des agents ; une anomalie collective peut révéler un choc macroéconomique structurel.
+
+% ════════════════════════════════════════════════════════════════
+\section{Vers une Méthode Hybride : Positionnement Théorique}
+
+\subsection{Architecture proposée : BiVAT}
+
+Sur la base des lacunes L1, L2 et L3 identifiées, notre méthode hybride  désignée provisoirement \textbf{BiVAT} (\textit{Bidirectional VAE-Associative Transformer})  est articulée autour de quatre composantes.
+
+\subsubsection{Composante 1 : Encodeur Transformer non causal (réponse à L1)}
+
+Le cœur de l'architecture est un encodeur Transformer dont l'attention est \textit{non masquée} (bidirectionnelle). Pour une séquence $\mathbf{X} \in \mathbb{R}^{T \times D}$ :
+$$\mathbf{H}^{\mathrm{bidir}} = \mathrm{TransformerEncoder}_{\mathrm{non\text{-}causal}}(\mathbf{X}) \in \mathbb{R}^{T \times d_{\mathrm{model}}}$$
+
+La distribution latente est ensuite paramétrée par projection sur les représentations contextuelles globales :
+$$\boldsymbol{\mu}_t = \mathbf{W}_\mu\,\mathbf{H}^{\mathrm{bidir}}_t, \qquad \log\boldsymbol{\sigma}^2_t = \mathbf{W}_\sigma\,\mathbf{H}^{\mathrm{bidir}}_t$$
+
+La non-causalité enrichit $q_\phi(\mathbf{z}_t|\mathbf{x}) = \mathcal{N}(\boldsymbol{\mu}_t(\mathbf{x}_{1:T}), \boldsymbol{\sigma}^2_t(\mathbf{x}_{1:T}))$ : la distribution latente au temps $t$ intègre l'information de toute la séquence, améliorant particulièrement l'encodage aux instants de rupture.
+
+\subsubsection{Composante 2 : Fonction objectif hybride ELBO + Association Discrepancy}
+
+La fonction objectif étend l'ELBO standard en y intégrant le signal discriminant de l'Association Discrepancy :
+
+$$\mathcal{L}_{\mathrm{BiVAT}} = \underbrace{\sum_{t=1}^T\left[\mathbb{E}_{q_\phi}[\log p_\theta(\mathbf{x}_t|\mathbf{z}_t)] - \beta_t\,D_{\mathrm{KL}}(q_\phi(\mathbf{z}_t|\mathbf{x})\|\mathcal{N}(\mathbf{0},\mathbf{I}))\right]}_{\text{ELBO variationnel}} \mp \lambda\cdot\underbrace{\mathrm{AssDis}(\mathbf{X})}_{\text{critère discriminant}}$$
+
+Le signe $\mp$ alterne entre les deux phases de la stratégie minimax héritée de l'Anomaly Transformer. Dans la phase Maximize, l'Association Discrepancy est amplifiée tout en maintenant la reconstruction probabiliste ; dans la phase Minimize, les associations convergent.
+
+\subsubsection{Composante 3 : Score d'anomalie multi-niveaux avec intervalle de confiance (réponses à L2 et L3)}
+
+\textit{Score ponctuel avec incertitude} (réponse à L2) :
+$$s^{\mathrm{point}}_t = -\frac{1}{L}\sum_{\ell=1}^L\log p_\theta(\mathbf{x}_t|\mathbf{z}_t^{(\ell)}) + \gamma\,D_{\mathrm{KL}}(q_\phi(\mathbf{z}_t|\mathbf{x})\|\mathcal{N}(\mathbf{0},\mathbf{I}))$$
+
+L'intervalle de confiance est estimé par la variance des reconstructions Monte Carlo :
+$$\sigma^2_{s_t} = \mathrm{Var}_\ell\!\left[\log p_\theta(\mathbf{x}_t|\mathbf{z}_t^{(\ell)})\right]$$
+
+\textit{Score contextuel}  divergence KL entre la distribution latente de $\mathbf{x}_t$ et celle de son voisinage local :
+$$s^{\mathrm{context}}_t = D_{\mathrm{KL}}(q_\phi(\mathbf{z}_t|\mathbf{x})\|p_\phi(\mathbf{z}_t|\mathbf{x}_{t-W:t+W}))$$
+
+\textit{Score collectif}  agrégation sur une fenêtre glissante de longueur $K$ :
+$$s^{\mathrm{collect}}_{t:t+K} = \frac{1}{K}\sum_{k=0}^{K}s^{\mathrm{point}}_{t+k}$$
+
+\textit{Score discriminant intégré}  enrichi par l'Association Discrepancy :
+$$s^{\mathrm{discrim}}_t = \mathrm{Softmax}(-\mathrm{AssDis}^{(1:L)}_t) \cdot s^{\mathrm{point}}_t$$
+
+Le score final est une combinaison hiérarchique de ces quatre niveaux, avec des poids appris ou calibrés selon le type d'anomalie ciblée.
+
+\subsubsection{Composante 4 : Mécanisme d'explicabilité SHAP inter-couches (réponse à L3-explicabilité)}
+
+En s'appuyant sur SHAPAttenVAE, des poids d'attention inter-couches $\boldsymbol{\alpha}^{(\ell)}_t$ sont calibrés pour être proportionnels aux valeurs SHAP locales via la perte de cohérence :
+$$\mathcal{L}_{\mathrm{expl}} = \sum_t\left\|\boldsymbol{\alpha}_t - \hat{\boldsymbol{\phi}}_t\right\|_2^2$$
+
+Cela permettra, pour chaque anomalie détectée au mois $t$, de produire une attribution dimensionnelle du type « 67\% de l'anomalie est portée par la série \texttt{Crédits\_ENF}, 22\% par \texttt{Dépôts\_transf} ».
+
+% ════════════════════════════════════════════════════════════════
+\section{Cohérence avec le Dataset BEAC-CEMAC}
+
+\subsection{Caractéristiques structurelles du dataset}
+
+Le dataset de référence  situation de l'actif/passif des Autres Sociétés de Dépôts (2SR) du Cameroun selon la nomenclature IFS  présente les caractéristiques suivantes : environ 195 observations mensuelles (décembre 2001 à mars 2026), environ 55 indicateurs financiers, données en milliards de FCFA, avec valeurs manquantes sporadiques, forte hétérogénéité d'échelles, saisonnalité budgétaire annuelle marquée (pics de fin d'année liés aux décaissements de l'État), et ruptures structurelles documentées (choc COVID-19 2020--2021, croissance des actifs non financiers 2024).
+
+\subsection{Cohérence méthode par méthode}
+
+\textbf{VAE fondamental (Kingma \& Welling, An \& Cho).} Applicable sur les données mensuelles après stationnarisation, mais inadapté tel quel à la structure temporelle. La reconstruction probability est applicable sur les 55 séries en mode panel, mais exige une normalisation par série (z-score).
+
+\textbf{OmniAnomaly (GRU-VAE).} Directement applicable : les 55 séries et 195 pas de temps sont dans la cible opérationnelle. La prior temporelle conditionnelle s'adapte bien aux dynamiques monétaires avec tendances progressives. Limite : le GRU encode mal les ruptures structurelles survenant plus de 12 mois en arrière.
+
+\textbf{Anomaly Transformer.} L'utilisation de méthodes ML pour détecter les anomalies dans les données rapportées par les institutions financières est une application directe pour les banques centrales. L'Association Discrepancy est conceptuellement cohérente avec la surveillance monétaire : une variation mensuelle anormale est précisément caractérisée par l'impossibilité de construire des associations non-triviales avec le reste de la série. Les 195 observations sont suffisantes pour pré-entraîner un Anomaly Transformer de taille modeste ($L = 2$ ou $L = 3$ blocs, $d_{\mathrm{model}} = 64$ ou $128$).
+
+\textbf{T-VAE.} Très bien adapté : l'intégration profonde Transformer-dans-VAE permet de modéliser simultanément les dépendances temporelles et les corrélations inter-séries (entre les 55 indicateurs). La résolution mensuelle et la taille du dataset imposent une architecture modérée (2 couches Transformer, dimension 64, 4 têtes d'attention).
+
+\textbf{SHAPAttenVAE.} Extrêmement adapté au contexte BEAC. L'exigence réglementaire COBAC de traçabilité algorithmique fait de l'explicabilité une nécessité fonctionnelle. Les explications du type « l'anomalie de mars 2020 est principalement portée par l'effondrement des \texttt{Crédits\_SNF} et la contraction des \texttt{Dépôts\_transf} » sont directement exploitables par les équipes de surveillance.
+
+\textbf{BiVAT (méthode proposée).} La cohérence est maximale sur tous les axes : l'encodeur bidirectionnel est adapté au mode d'audit a posteriori (toute la série disponible au moment de l'analyse) ; le score multi-niveaux permet de distinguer les erreurs de collecte (anomalies ponctuelles) des chocs macroéconomiques (anomalies collectives) ; les intervalles de confiance permettent de calibrer les alertes selon leur degré de certitude ; l'explicabilité SHAP satisfait les exigences COBAC.
+
+\subsection{Prétraitements requis}
+
+Avant toute application des méthodes profondes, le pipeline de prétraitement suivant est indispensable.
+
+(1)~\textit{Imputation des valeurs manquantes} : interpolation linéaire pour les lacunes courtes ($\leq 3$ mois) ; méthode MICE pour les lacunes longues.
+
+(2)~\textit{Normalisation par série} : standardisation z-score sur la fenêtre d'entraînement (décembre 2001 à décembre 2019), appliquée ensuite à la fenêtre de test (2020--2026).
+
+(3)~\textit{Décomposition STL} : séparation tendance, saisonnalité (12 mois) et résidu. Les méthodes profondes sont appliquées sur les résidus, éliminant les faux positifs dus à la saisonnalité budgétaire.
+
+(4)~\textit{Stratégie de fenêtrage} : fenêtre glissante de $W = 24$ mois (deux années) avec un pas de 1 mois, produisant environ 171 fenêtres d'entraînement sur la période 2001--2019.
+
+% ════════════════════════════════════════════════════════════════
+\section{Conclusion}
+
+\subsection{Bilan de la revue de littérature}
+
+Ce document a présenté une analyse technique approfondie de treize travaux scientifiques couvrant les fondations théoriques du VAE (Kingma \& Welling, 2013 ; An \& Cho, 2015), les architectures récurrentes-variationnelles (OmniAnomaly, 2019), les Transformers spécialisés pour la détection d'anomalies (Anomaly Transformer, 2022 ; TranAD, 2022) et les hybrides VAE-Transformer de plus en plus intégrés (Song et al., 2023 ; Wang et al., 2022 ; Zhang et al., 2021 ; T-VAE, 2025 ; VLT-Anomaly, 2025 ; SHAPAttenVAE, 2025 ; MAAT, 2025).
+
+L'évolution architecturale visible à travers ce corpus suit une trajectoire cohérente : depuis le VAE statique (1 entrée indépendante $\rightarrow$ 1 score ponctuel) vers les hybrides GRU-VAE (séquence $\rightarrow$ score séquentiel) vers les Transformers-VAE superficiels (deux branches parallèles $\rightarrow$ fusion de scores) vers les Transformers-VAE profonds (encodeur Transformer $\rightarrow$ espace latent riche $\rightarrow$ score probabiliste).
+
+\subsection{Les trois contributions cibles}
+
+La cartographie transversale identifie trois lacunes non résolues simultanément dans la littérature.
+
+\textbf{L1  Intégration profonde avec bidirectionnalité} : l'encodeur non causal enrichit l'espace latent de l'information future, améliorant la détection aux points de rupture. Aucun travail existant ne combine intégration profonde (T-VAE) et non-causalité (BERT) dans un cadre variationnel avec une fonction objectif formalisée incluant l'Association Discrepancy.
+
+\textbf{L2  Intervalles de confiance sur le score d'anomalie} : la nature stochastique de l'espace latent VAE permet naturellement l'estimation d'incertitude par Monte Carlo. Cette propriété est sous-exploitée dans les hybrides existants. Notre méthode produira un score $s_t \pm \sigma_{s_t}$ permettant de distinguer les anomalies certaines des anomalies ambiguës.
+
+\textbf{L3  Score hiérarchique multi-niveaux avec attribution dimensionnelle} : la distinction ponctuel / contextuel / collectif, couplée à l'explicabilité SHAP inter-couches, fournit pour la première fois un outil d'audit algorithmique complet, adapté aux exigences réglementaires COBAC.
+
+\subsection{Perspectives de déploiement à la BEAC}
+
+La méthode BiVAT, une fois implémentée, permettra à la BEAC de produire chaque mois un rapport structuré de surveillance monétaire contenant : (a)~une liste ordonnée des 5 à 10 observations les plus anormales de la période, avec leurs scores de confiance ; (b)~pour chaque anomalie, une décomposition de sa nature (ponctuelle / contextuelle / collective) ; (c)~une attribution dimensionnelle expliquant quelles séries IFS contribuent le plus à l'anomalie ; (d)~une recommandation de vérification différenciée selon le niveau de confiance du modèle.
+
+Ce dispositif, conforme aux obligations de traçabilité algorithmique COBAC, constituerait le premier système de surveillance macroprudentielle basé sur des architectures hybrides VAE-Transformer explicables déployé dans la zone CEMAC.
+
+% ════════════════════════════════════════════════════════════════
+\section*{Bibliographie}
+\addcontentsline{toc}{section}{Bibliographie}
+
+\begin{enumerate}
+\item[\lbrack F1\rbrack] Kingma, D.P., \& Welling, M. (2013). \textit{Auto-Encoding Variational Bayes}. arXiv:1312.6114.
+
+\item[\lbrack F2\rbrack] An, J., \& Cho, S. (2015). \textit{Variational Autoencoder Based Anomaly Detection Using Reconstruction Probability}. SNU Data Mining Center Technical Report.
+
+\item[\lbrack F3\rbrack] Su, Y., Zhao, Y., Niu, C., Liu, R., Sun, W., \& Pei, D. (2019). Robust Anomaly Detection for Multivariate Time Series through Stochastic Recurrent Neural Network. In \textit{Proceedings of the 25th ACM SIGKDD International Conference on Knowledge Discovery \& Data Mining} (pp. 2828--2837).
+
+\item[\lbrack T1\rbrack] Xu, J., Wu, H., Wang, J., \& Long, M. (2022). Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy. In \textit{International Conference on Learning Representations (ICLR 2022, Spotlight)}.
+
+\item[\lbrack T2\rbrack] Tuli, S., Casale, G., \& Jennings, N.R. (2022). TranAD: Deep Transformer Networks for Anomaly Detection in Multivariate Time Series Data. \textit{Proceedings of the VLDB Endowment}, 15(6), 1201--1214.
+
+\item[\lbrack H1\rbrack] Song, A., Seo, E., \& Kim, H. (2023). Anomaly VAE-Transformer: A Deep Learning Approach for Anomaly Detection in Decentralized Finance. \textit{IEEE Access}, 11, 98115--98131.
+
+\item[\lbrack H2\rbrack] Li, C., Kiat, Y.C., Jing, J., \& Long, C. (2025). T-VAE: Transformer-Based Variational AutoEncoder for Perceiving Anomalies in Multivariate Time Series Data. \textit{Expert Systems}, 42, e70078.
+
+\item[\lbrack H3\rbrack] Wang, H. et al. (2022). Variational Transformer-based Anomaly Detection Approach for Multivariate Time Series. \textit{Measurement}, Elsevier.
+
+\item[\lbrack H4\rbrack] Zhang, H., Xia, Y., Yan, T., \& Liu, G. (2021). Unsupervised Anomaly Detection in Multivariate Time Series through Transformer-based Variational Autoencoder. In \textit{Proceedings of the 33rd Chinese Control and Decision Conference (CCDC)}, pp. 281--286.
+
+\item[\lbrack A1\rbrack] He, X. et al. (2024). VAEAT: Variational AutoEncoder with Adversarial Training for Time Series Anomaly Detection. \textit{Information Sciences}, Elsevier.
+
+\item[\lbrack A2\rbrack] Xie, B., Huo, Z., \& Zhang, C. (2025). Unsupervised Anomaly Detection in Time Series Data via Enhanced VAE-Transformer Framework (VLT-Anomaly). \textit{Computers, Materials \& Continua}, 84(1), 843--860.
+
+\item[\lbrack A3\rbrack] Zhang, X., Wang, G., Chen, Y., Liu, Q., \& Wang, G. (2025). Inter-layer Explainable Variational Autoencoder Model for Multivariate Time Series Anomaly Detection (SHAPAttenVAE). \textit{Engineering Applications of Artificial Intelligence}, 159, 111585.
+
+\item[\lbrack A4\rbrack] Sellam, A.Z., Benaissa, I., Taleb-Ahmed, A., Patrono, L., \& Distante, C. (2025). Mamba Adaptive Anomaly Transformer with Association Discrepancy for Time Series (MAAT). \textit{Engineering Applications of Artificial Intelligence}, ScienceDirect.
+
+\item[] Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A.N., Kaiser, \L., \& Polosukhin, I. (2017). Attention Is All You Need. In \textit{Advances in Neural Information Processing Systems}, 30, 5998--6008.
+
+\item[] Pang, G., Shen, C., Cao, L., \& Van Den Hengel, A. (2021). Deep Learning for Anomaly Detection: A Review. \textit{ACM Computing Surveys}, 54(2), 1--38.
+
+\item[] Schlegl, T., Seeb{\"o}ck, P., Waldstein, S.M., Langs, G., \& Schmidt-Erfurth, U. (2019). f-AnoGAN: Fast Unsupervised Anomaly Detection with Generative Adversarial Networks. \textit{Medical Image Analysis}, 54, 30--44.
+
+\item[] Moukoko Ekambi, G.M. (2025). MKO-KAN : Détection de fraude Mobile Money par réseaux de Kolmogorov-Arnold hybrides en zone CEMAC. Rapport de stage, BEAC / ENSPD / Université de Douala, LIDIA Laboratory.
+\end{enumerate}
+
+\vspace{2cm}
+\hrule
+\vspace{0.5cm}
+\noindent{\small\textit{Document rédigé dans le cadre du stage de recherche à la Banque des États de l'Afrique Centrale (BEAC), M2 Data Science \& IA, ENSPD / Université de Douala  LIDIA Laboratory. Août 2026.}}
+
+\end{document}

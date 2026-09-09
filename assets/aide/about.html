@@ -1,0 +1,60 @@
+<h2 style="color:#7a4f00">&Agrave; propos de BEAC Anomaly Detector</h2>
+
+<h3>Contexte institutionnel</h3>
+<p>Ce logiciel est développé pour la <b>Banque des États de l&rsquo;Afrique Centrale (BEAC)</b>,
+banque centrale commune aux six États membres de la Communauté Économique et Monétaire de
+l&rsquo;Afrique Centrale (CEMAC) : Cameroun, République du Congo, Gabon, Guinée Équatoriale,
+République Centrafricaine et Tchad.</p>
+<p>Son objectif est d&rsquo;assister les économistes de la Direction de la Recherche et des Statistiques
+dans la surveillance des agrégats monétaires et la détection précoce d&rsquo;anomalies susceptibles
+d&rsquo;indiquer des déséquilibres financiers ou des chocs systémiques.</p>
+
+<h3>Modèles utilisés</h3>
+<table border="0" cellpadding="6">
+<tr>
+  <td valign="top"><b>LOF*</b></td>
+  <td>Local Outlier Factor agrégé sur une plage de MinPts [10, 30]
+  (Breunig, Kriegel, Ng &amp; Sander, 2000).
+  Détection non supervisée basée sur la densité locale.
+  Pré-traitement : imputation MICE &rarr; standardisation MAD &rarr; décomposition STL &rarr;
+  RPCA &rarr; ACP &rarr; LOF*.</td>
+</tr>
+<tr>
+  <td valign="top"><b>BiVAT</b></td>
+  <td>Bidirectional Variational Anomaly Transformer
+  (inspiré de Xu <i>et al.</i>, 2022 &mdash; Anomaly Transformer).
+  Architecture : Encodeur BiTransformer + BiLSTM + VAE + TransformerDecoder.
+  Score = reconstruction error &times; Association Discrepancy (KL symétrique).
+  Prédiction conforme : SSBC + EnbPI rolling.
+  Explicabilité : SHAP DeepExplainer.</td>
+</tr>
+</table>
+
+<h3>Données</h3>
+<ul>
+  <li><b>Période</b> : janvier 2001 &ndash; mars 2026 (195 observations mensuelles)</li>
+  <li><b>Indicateurs</b> : 55 agrégats monétaires par pays et volet</li>
+  <li><b>Volets</b> : Actif (emplois de la monnaie) et Passif (ressources)</li>
+  <li><b>Pays</b> : 6 États membres CEMAC</li>
+  <li><b>Format source</b> : fichiers Excel (.xlsx) mappés BEAC 2SR</li>
+</ul>
+
+<h3>Références bibliographiques</h3>
+<ul>
+  <li>Breunig, M. M., Kriegel, H.-P., Ng, R. T., &amp; Sander, J. (2000).
+  <i>LOF: Identifying density-based local outliers.</i> ACM SIGMOD.</li>
+  <li>Xu, J., Wu, H., Wang, J., &amp; Long, M. (2022).
+  <i>Anomaly Transformer: Time series anomaly detection with association discrepancy.</i>
+  ICLR 2022.</li>
+  <li>Candès, E. J., Li, X., Ma, Y., &amp; Wright, J. (2011).
+  <i>Robust principal component analysis.</i> JACM.</li>
+  <li>Angelopoulos, A. N., &amp; Bates, S. (2023).
+  <i>Conformal prediction: A gentle introduction.</i> FNT in ML.</li>
+  <li>Cleveland, R. B., Cleveland, W. S., McRae, J. E., &amp; Terpenning, I. (1990).
+  <i>STL: A seasonal-trend decomposition.</i> J. Official Statistics.</li>
+</ul>
+
+<h3>Version</h3>
+<p>v1.0 &mdash; BEAC Anomaly Detector<br>
+Direction de la Recherche et des Statistiques &mdash; BEAC &middot; CEMAC<br>
+<small>Développé avec Python 3.10 &middot; Dash &middot; PyTorch &middot; Plotly &middot; PyQt6</small></p>

@@ -1,0 +1,1906 @@
+\documentclass[12pt,a4paper]{article}
+
+% ── Bibliographie (doit précéder babel) ──────────────────────────
+\usepackage{natbib}
+
+% ── Encodage et langue ──────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+
+% ── Mise en page ─────────────────────────────────────────────────
+\usepackage[top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% ── Mathématiques ────────────────────────────────────────────────
+\usepackage{amsmath, amssymb}
+\usepackage{mathtools}
+
+% ── Tableaux ─────────────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{tabularx}
+
+% ── Graphiques ───────────────────────────────────────────────────
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+
+% ── Typographie ──────────────────────────────────────────────────
+\usepackage{microtype}
+\usepackage{lmodern}
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+% ── Mise en page paysage ─────────────────────────────────────────
+\usepackage{pdflscape}
+
+% ── Liens ────────────────────────────────────────────────────────
+\usepackage[colorlinks=true, linkcolor=black, citecolor=black,
+            urlcolor=black]{hyperref}
+
+% ── En-tête / pied de page ───────────────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{Système de visualisation  LOF et BiVAT}}
+\fancyhead[R]{\small\textit{MOUKOKO EKAMBI G.M.}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ── Sections ─────────────────────────────────────────────────────
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\itshape}{\thesubsubsection}{0.5em}{}
+
+% ── Commandes utilitaires ────────────────────────────────────────
+\newcommand{\nd}{--}
+\newcommand{\placeholder}[2]{%
+  \begin{center}
+  \fbox{\begin{minipage}{0.85\textwidth}
+  \centering\vspace{1.2cm}
+  \texttt{[PLACEHOLDER  #1]}\\[0.4em]
+  \small\textit{#2}
+  \vspace{1.2cm}
+  \end{minipage}}
+  \end{center}
+}
+
+
+
+% ════════════════════════════════════════════════════════════════
+\begin{document}
+
+% ── Page de titre ────────────────────────────────────────────────
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+
+{\LARGE\bfseries
+SYSTÈME DE VISUALISATION POUR LA DÉTECTION DE POINTS D'INTÉRÊT\\[0.4em]
+\large\normalfont
+Catalogue raisonné des graphiques, positionnement dans le workflow
+et guide d'utilisation opérationnelle  Modèles LOF et BiVAT\\[0.4em]
+}
+
+\vspace{2cm}
+
+{\large\bfseries MOUKOKO EKAMBI GEORGES MIGUEL}\\[0.5em]
+{\normalsize\itshape
+Stagiaire, Banque des États de l'Afrique Centrale (BEAC)\\
+M2 Data Science \& IA  ENSPD / Université de Douala, LIDIA Laboratory
+}
+
+\vspace{2cm}
+
+{\normalsize Août 2026}
+
+\vfill
+
+{\small
+Document rédigé dans le cadre du stage de recherche à la Banque des États
+de l'Afrique Centrale (BEAC), M2 Data Science \& IA,
+ENSPD / Université de Douala  LIDIA Laboratory.
+}
+\end{titlepage}
+
+% ── Résumé ───────────────────────────────────────────────────────
+\begin{abstract}
+Ce document décrit le système complet de visualisation associé à l'outil
+de détection de points d'intérêt dans les données monétaires BEAC-CEMAC,
+développé dans le cadre d'une étude comparative à deux modèles : le Local
+Outlier Factor (LOF, Modèle~1) et BiVAT (\textit{Bidirectional
+VAE-Associative Transformer}, Modèle~2). Pour chaque graphique, trois
+informations sont documentées avec le même niveau de rigueur que les
+documents méthodologiques compagnons : la pertinence analytique dans le
+contexte BEAC, le positionnement précis dans le workflow de détection en
+quatre phases (diagnostic des données, calibration interne, production des
+résultats, comparaison inter-modèles), et les données requises pour sa
+production. Le document identifie quatorze graphiques issus du corpus
+initial, évalue leur pertinence individuelle, en écarte deux pour des
+raisons méthodologiques documentées, et propose sept graphiques
+supplémentaires absents du corpus initial mais nécessaires à la complétude
+du système visuel. Le catalogue récapitulatif final (section~6) constitue
+le guide d'implémentation opérationnelle de l'outil.
+
+\bigskip
+\noindent\textbf{Mots-clés :} visualisation, détection d'anomalies,
+séries temporelles financières, LOF, BiVAT, BEAC, CEMAC, workflow,
+points d'intérêt, audit macroprudentiel.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ════════════════════════════════════════════════════════════════
+\section{Introduction et Architecture du Système Visuel}
+
+\subsection{Pourquoi un système de visualisation dédié}
+
+La détection de points d'intérêt dans les données monétaires BEAC-CEMAC
+produit des scores numériques  scores LOF* et scores BiVAT  qui ne
+sont exploitables opérationnellement que s'ils sont accompagnés d'un système
+de visualisation structuré. Un superviseur prudentiel BEAC confronté à une
+liste de scores numériques ne peut pas prendre de décision d'investigation
+sans savoir à quoi correspondent ces scores dans le temps, quels indicateurs
+IFS les portent, et si les deux modèles s'accordent sur les mêmes alertes.
+
+Ce document traite le système de visualisation comme une composante
+méthodologique à part entière, et non comme un simple habillage graphique
+des résultats. Chaque graphique est analysé sous trois angles : sa pertinence
+analytique dans le contexte BEAC (est-ce qu'il apporte une information
+non disponible autrement ?), son positionnement dans le workflow de détection
+(à quel moment du processus est-il produit et consulté ?), et ses dépendances
+de calcul (quelles données et quels résultats intermédiaires sont nécessaires
+à sa production ?).
+
+\subsection{Architecture du workflow en quatre phases}
+
+Le workflow de détection de points d'intérêt est organisé en quatre phases
+séquentielles. Chaque phase a un objectif distinct et produit un ensemble
+de graphiques spécifiques. La figure~\ref{fig:workflow} schématise cette
+architecture.
+
+\begin{figure}[H]
+\centering
+\placeholder{Fig. Workflow}{
+Diagramme en quatre blocs séquentiels : Phase~1 Diagnostic des données
+$\rightarrow$ Phase~2 Calibration et validation interne $\rightarrow$
+Phase~3 Production et interprétation des résultats $\rightarrow$
+Phase~4 Comparaison inter-modèles et décision finale. Chaque bloc liste
+les graphiques associés et les données en entrée/sortie.
+}
+\caption{Architecture du workflow de détection en quatre phases.
+Les graphiques associés à chaque phase sont indiqués entre parenthèses.}
+\label{fig:workflow}
+\end{figure}
+
+\textbf{Phase~1  Diagnostic des données.} Objectif : valider la qualité
+des données brutes et la conformité de chaque étape du prétraitement commun
+avant d'engager les modèles. Cette phase est exécutée une seule fois, en
+amont des deux modèles. Elle répond à la question : les données sont-elles
+exploitables et le prétraitement produit-il les transformations attendues ?
+
+\textbf{Phase~2  Calibration et validation interne.} Objectif : régler
+les hyperparamètres de chaque modèle et valider que les deux modèles
+fonctionnent correctement sur les données BEAC avant de produire des
+résultats sur la fenêtre de test. Cette phase est exécutée séparément pour
+LOF et pour BiVAT, sur la fenêtre d'entraînement et de calibration
+(décembre~2001 -- décembre~2019).
+
+\textbf{Phase~3  Production et interprétation des résultats.} Objectif :
+appliquer les modèles calibrés sur la fenêtre de test (mars~2020 --
+mars~2026) et produire les alertes avec leur interprétation économique.
+C'est la phase principale de l'outil opérationnel. Les graphiques de cette
+phase sont ceux qu'un superviseur BEAC consultera directement.
+
+\textbf{Phase~4  Comparaison inter-modèles et décision finale.} Objectif :
+confronter les résultats LOF et BiVAT, identifier les concordances et les
+divergences, et formuler une recommandation opérationnelle structurée pour
+la surveillance macroprudentielle.
+
+\subsection{Convention de notation}
+
+Dans ce document, les graphiques issus du corpus initial proposé sont
+numérotés Fig.~1 à Fig.~14. Les graphiques supplémentaires identifiés
+comme manquants sont notés Fig.~A à Fig.~G. La colonne \textbf{Priorité}
+dans le catalogue récapitulatif (section~6) utilise trois niveaux :
+\textbf{Essentiel} (nécessaire à la validité du workflow), \textbf{Important}
+(apporte une information analytique significative) et \textbf{Complémentaire}
+(utile pour l'exploration ou la présentation mais non critique).
+
+% ════════════════════════════════════════════════════════════════
+\section{Phase 1  Diagnostic des Données}
+
+Cette phase regroupe les graphiques produits après le prétraitement commun
+et avant l'exécution des modèles. Ils valident que les données sont
+exploitables, que l'imputation est adéquate, que la décomposition STL
+produit des résidus stationnaires, et que la structure de covariance des
+résidus justifie la réduction de dimension.
+
+\subsection{Fig.~1  Carte des données manquantes}
+
+\subsubsection{Description}
+
+Matrice binaire de dimensions (indicateurs IFS $\times$ mois), où chaque
+case est noire si la valeur est manquante ou contient une erreur
+\texttt{\#VALUE!} Excel, et blanche si la valeur est disponible. Une
+colonne de droite indique le taux de complétude par indicateur ; une ligne
+du bas indique le taux de complétude par mois.
+
+\placeholder{Fig. 1  Carte des données manquantes}{
+Matrice binaire (55 indicateurs × 195 mois). Axe vertical : indicateurs
+IFS triés par taux de complétude décroissant. Axe horizontal : mois de
+déc. 2001 à mars 2026. Cases noires = NaN ou \#VALUE!. Barres latérales
+de taux de complétude. Fichier : \texttt{fig1\_missing\_data\_map.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+Ce graphique est le premier produit dans le workflow et l'un des plus
+importants. Il remplit trois fonctions simultanées. D'une part, il rend
+visible la répartition spatiale et temporelle des lacunes, permettant de
+distinguer immédiatement les trois régimes d'imputation : lacunes courtes
+isolées (interpolation linéaire), lacunes étendues internes (MICE), et
+lacunes structurelles en début de série (troncature). D'autre part, il
+révèle si des indicateurs entiers sont systématiquement manquants sur
+certaines périodes  ce qui signalerait un problème de collecte
+structurel à signaler à la BEAC indépendamment de toute anomalie de
+contenu. Enfin, il documente empiriquement la justification de l'exclusion
+des séries dont le taux d'imputation dépasse 20\,\%, évitant que cette
+décision apparaisse arbitraire dans le rapport final.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~1  Diagnostic des données.} Ce graphique est produit
+immédiatement après le chargement des données brutes, avant toute
+imputation. Il constitue le point de départ de la validation de qualité.
+Il est consulté une seule fois et ne sera pas mis à jour lors des exécutions
+suivantes sur les mêmes fichiers sources.
+
+\subsubsection{Données requises}
+
+Données brutes au format XLSX, après lecture et conversion des erreurs
+\texttt{\#VALUE!} en \texttt{NaN}. Aucune imputation ni normalisation
+préalable. Un graphique par fichier pays/volet (12 graphiques au total)
+ou une version agrégée multi-pays selon l'usage.
+
+\subsubsection{Décision supportée}
+
+Validation de la stratégie d'imputation (section~3.1 du document de
+prétraitement). Identification des séries à exclure pour taux
+d'imputation > 20\,\%. Détection de problèmes de collecte structurels
+à signaler indépendamment de la détection d'anomalies.
+
+\textbf{Priorité : Essentiel.}
+
+\subsection{Fig.~2  Heatmap des corrélations des résidus STL}
+
+\subsubsection{Description}
+
+Matrice de corrélations de Pearson de dimensions ($55 \times 55$), calculée
+sur les résidus $R_{i,t}$ après décomposition RobustSTL. Les indicateurs
+sont réordonnés par clustering hiérarchique pour faire apparaître les blocs
+de corrélation. L'échelle de couleur va du bleu foncé (corrélation $-1$)
+au rouge foncé (corrélation $+1$), avec le blanc à zéro.
+
+\placeholder{Fig. 2  Heatmap des corrélations des résidus STL}{
+Matrice 55×55. Clustering hiérarchique Ward sur les lignes et colonnes.
+Dendrogrammes latéraux. Diagonale = 1 (rouge foncé). Blocs visibles
+attendus : sous-postes Crédits, sous-postes Dépôts, Titres.
+Fichier : \texttt{fig2\_heatmap\_correlations\_stl.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+Ce graphique est produit sur les résidus STL, non sur les données brutes.
+Cette distinction est fondamentale : sur données brutes, la heatmap
+reflèterait principalement la tendance macroéconomique commune à tous les
+indicateurs (les crédits et les dépôts croissent tous sur 2001--2026),
+masquant les corrélations structurelles entre résidus. Sur résidus STL,
+elle révèle les blocs de redondance entre sous-postes du bilan  par
+exemple, les résidus des crédits aux ménages et aux sociétés non financières
+corrèlent probablement fortement, justifiant leur compression en composantes
+principales.
+
+Ce graphique remplit deux fonctions complémentaires. Il justifie la
+réduction de dimension par RPCA : si la heatmap révèle une structure
+fortement bloc-diagonale, la variance est effectivement concentrée dans un
+sous-espace de faible dimension, validant l'approche RPCA. Il justifie
+également l'Association Discrepancy de BiVAT : les blocs de corrélation
+visibles en Phase~1 deviennent les \textit{patterns d'association normaux}
+que BiVAT apprend à modéliser, et dont les ruptures constituent des anomalies
+collectives au sens de la lacune~L1.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~1  Diagnostic des données.} Ce graphique est produit
+après la décomposition RobustSTL et avant la réduction de dimension. Il
+est consulté une fois pour valider la structure des données d'entrée des
+deux modèles.
+
+\subsubsection{Données requises}
+
+Résidus $R_{i,t}$ après décomposition RobustSTL et normalisation
+médiane/MAD. Matrice de dimension $(N_{\mathrm{train}} \times 55)$ sur
+la fenêtre d'entraînement uniquement (décembre~2001 -- novembre~2018).
+
+\subsubsection{Décision supportée}
+
+Justification de la réduction de dimension (nombre de blocs visibles
+informe sur $k$). Identification des sous-espaces de corrélation pertinents
+pour l'interprétation économique des anomalies. Validation que les résidus
+STL ont une structure de covariance exploitable.
+
+\textbf{Priorité : Essentiel.}
+
+\subsection{Fig.~3  Décomposition RobustSTL à quatre panneaux}
+
+\subsubsection{Description}
+
+Pour trois indicateurs représentatifs choisis pour leur diversité de
+comportement (un indicateur à forte tendance comme les Crédits totaux, un
+à forte saisonnalité comme les Dépôts Transférables, un à forte volatilité
+résiduelle), quatre panneaux empilés verticalement : série brute $x_{i,t}$,
+tendance $T_{i,t}$, composante saisonnière $S_{i,t}$, résidu $R_{i,t}$.
+L'axe des abscisses est commun (mois, 2001--2026). Les ruptures
+macroéconomiques documentées (crise pétrolière 2015, COVID-19 2020) sont
+annotées par des lignes verticales.
+
+\placeholder{Fig. 3  Décomposition RobustSTL à quatre panneaux}{
+3 sous-figures côte à côte (indicateur 1, 2, 3), chacune avec 4 panneaux
+empilés. Hauteur totale : 24cm. Lignes verticales annotées : déc. 2015
+(nadir crise pétrolière), mars 2020 (COVID-19).
+Fichier : \texttt{fig3\_decomposition\_robststl.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+C'est la justification visuelle centrale du choix de travailler sur les
+résidus plutôt que sur les données brutes, pour les deux modèles. Ce
+graphique démontre de façon immédiatement accessible ce que le texte
+méthodologique argumente : la tendance capte la croissance nominale sur
+25 ans, la saisonnalité capte les cycles budgétaires annuels, et le résidu
+ après extraction de ces deux composantes  est une série approximativement
+stationnaire centrée sur zéro dont les déviations sont les candidats naturels
+aux anomalies. Sans ce graphique, le lecteur doit accepter sur parole que
+RobustSTL produit des résidus adaptés à la détection d'anomalies.
+
+Le choix de trois indicateurs de comportements différents couvre le spectre
+complet des données BEAC et permet au lecteur de généraliser visuellement
+à l'ensemble des 55 séries.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~1  Diagnostic des données.} Ce graphique est produit
+immédiatement après la décomposition RobustSTL, avant la normalisation et
+la réduction de dimension. Il valide que la décomposition produit les
+composantes attendues pour chaque type de série.
+
+\subsubsection{Données requises}
+
+Données brutes $x_{i,t}$ et composantes décomposées $T_{i,t}$, $S_{i,t}$,
+$R_{i,t}$ après RobustSTL. Période complète 2001--2026. Sélection manuelle
+des trois indicateurs représentatifs.
+
+\subsubsection{Décision supportée}
+
+Validation de la décomposition RobustSTL. Justification du travail sur
+les résidus pour les deux modèles. Vérification visuelle que les anomalies
+documentées (COVID-19 mars 2020) apparaissent comme des pics dans les
+résidus et non dans la tendance.
+
+\textbf{Priorité : Essentiel.}
+
+\subsection{Fig.~A  Évolution de la variance expliquée par RPCA dans le
+temps}
+
+\subsubsection{Description}
+
+Graphique en ligne montrant l'évolution du pourcentage de variance expliquée
+par les $k = 5$ premières composantes RPCA, calculé sur des fenêtres
+glissantes de 36 mois (pas de 1 mois) sur la période 2001--2026. L'axe
+des ordonnées va de 0 à 100\,\%. Les ruptures documentées sont annotées.
+Une ligne horizontale indique le seuil cible de 90\,\%.
+
+\placeholder{Fig. A  Variance expliquée RPCA dans le temps}{
+Courbe de la variance expliquée cumulée des 5 premières composantes RPCA
+sur fenêtres glissantes de 36 mois. Annotations : crise pétrolière 2015,
+COVID-19 2020. Ligne horizontale à 90\%. Si la courbe chute sous 90\% en
+2020, c'est un signal de rupture de régime documenté.
+Fichier : \texttt{figA\_variance\_rpca\_temporelle.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+Ce graphique est absent du corpus initial mais constitue une contribution
+analytique majeure. Un scree plot global calculé sur l'ensemble de la
+période 2001--2026 masque les changements de structure de covariance dans
+le temps. Si la variance expliquée par les cinq premières composantes chute
+significativement en 2020 (par exemple de 85\,\% à 65\,\%), cela signifie
+que la structure de covariance entre indicateurs a changé  information
+directement pertinente pour deux raisons. D'une part, elle signale une
+rupture de régime indépendamment de tout score LOF ou BiVAT, constituant
+une détection précoce de niveau structurel. D'autre part, elle documente
+empiriquement l'une des spécificités des données financières BEAC (non-stationnarité
+de la structure de covariance) qui justifie RevIN dans le pipeline BiVAT
+et la Conformal Prediction pondérée.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~1  Diagnostic des données.} Ce graphique est produit après
+la décomposition RobustSTL et la normalisation MAD, en parallèle de Fig.~2.
+Il est consulté une fois pour établir si le nombre $k$ de composantes doit
+être fixe ou adaptatif dans le temps.
+
+\subsubsection{Données requises}
+
+Résidus normalisés $x_{i,t}^*$ après RobustSTL et médiane/MAD. Application
+de RPCA sur fenêtres glissantes de 36 mois. Période complète 2001--2026.
+
+\subsubsection{Décision supportée}
+
+Validation du choix de $k$ fixe vs adaptatif pour la RPCA du pipeline LOF.
+Détection précoce de ruptures de régime au niveau structural (indépendante
+des scores LOF et BiVAT). Justification empirique de RevIN et CP pondérée
+pour BiVAT sur les périodes à forte chute de variance expliquée.
+
+\textbf{Priorité : Important.}
+% ════════════════════════════════════════════════════════════════
+\section{Phase 2  Calibration et Validation Interne des Modèles}
+
+Cette phase regroupe les graphiques produits pendant l'entraînement et la
+calibration des deux modèles, sur la fenêtre décembre~2001 -- décembre~2019.
+Ils valident que chaque modèle fonctionne correctement sur les données BEAC
+avant d'être appliqué à la fenêtre de test. Aucun graphique de cette phase
+n'est présenté dans le rapport final à la BEAC  ils constituent des
+outils de validation interne pour le développeur et le chercheur.
+
+\subsection{Fig.~4  Scree plot RPCA}
+
+\subsubsection{Description}
+
+Graphique à double axe : barres verticales représentant la variance
+expliquée par chaque composante individuelle (axe gauche, pourcentage),
+et courbe cumulée superposée (axe droit, pourcentage cumulé). Le nombre
+de composantes retenues $k$ est indiqué par une ligne verticale pointillée
+à l'intersection de la courbe cumulée avec le seuil de 90\,\%. L'axe des
+abscisses va de la composante~1 à la composante~20.
+
+\placeholder{Fig. 4  Scree plot RPCA}{
+Barres : variance expliquée par composante (\%). Courbe : variance
+cumulée (\%). Ligne horizontale à 90\%. Ligne verticale à $k$ retenu.
+Annotation : ``$k = X$ composantes expliquent $Y$\% de la variance.''
+Calculé sur résidus normalisés, fenêtre d'entraînement 2001--2018.
+Fichier : \texttt{fig4\_scree\_plot\_rpca.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+Ce graphique justifie empiriquement le choix du nombre de composantes $k$
+retenues pour la réduction de dimension du pipeline LOF. Sans lui, le
+choix de $k$ est arbitraire. Le critère du coude (point d'inflexion de
+la courbe cumulée) est visualisé directement. Si le coude apparaît à
+$k = 8$ mais que 90\,\% de variance est atteint à $k = 12$, le graphique
+permet de trancher entre les deux critères avec une justification visuelle
+claire. Il révèle également le degré de redondance entre indicateurs : si
+5 composantes expliquent 90\,\% de la variance pour 55 indicateurs, la
+redondance est très élevée, ce qui est cohérent avec la structure des
+sous-postes du bilan IFS.
+
+Ce graphique est spécifique au pipeline LOF. BiVAT n'ayant pas de réduction
+de dimension préalable, il n'a pas d'équivalent dans le pipeline BiVAT.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~2  Calibration LOF.} Ce graphique est produit lors de la
+première application de RPCA sur la fenêtre d'entraînement. Il est consulté
+une seule fois pour fixer $k$ avant d'exécuter le LOF. Il n'est pas
+reproductible à chaque exécution opérationnelle  $k$ est fixé lors de
+la calibration initiale.
+
+\subsubsection{Données requises}
+
+Résidus normalisés $x_{i,t}^*$ sur la fenêtre d'entraînement
+(décembre~2001 -- novembre~2018). Application de RPCA. Valeurs propres
+de la composante $L$ après décomposition.
+
+\subsubsection{Décision supportée}
+
+Détermination de $k$ pour la RPCA du pipeline LOF. Validation que la
+réduction de dimension est justifiée (forte concentration de la variance).
+Choix entre critère du coude et critère des 90\,\% si les deux divergent.
+
+\textbf{Priorité : Essentiel (pipeline LOF uniquement).}
+
+\subsection{Fig.~5  Biplot ACP (composantes 1 et 2)}
+
+\subsubsection{Description}
+
+Nuage de points des 195 observations projetées dans le plan des deux
+premières composantes principales (après RPCA). Chaque point représente
+un mois, coloré par année (dégradé chromatique de 2001 à 2026). Les
+vecteurs des indicateurs dominants (ceux dont le loading dépasse 0.3 en
+valeur absolue sur l'une des deux composantes) sont superposés. Les mois
+identifiés comme candidats anomaux (scores LOF* élevés) sont marqués
+d'un symbole distinct.
+
+\placeholder{Fig. 5  Biplot ACP (composantes 1 et 2)}{
+Nuage de 195 points colorés par année (gradient chaud 2001→2026 froid).
+Vecteurs des indicateurs dominants en gris. Points anomaux candidats
+marqués d'une croix rouge. Axes : CP1 ($X$\% variance), CP2 ($Y$\%
+variance). Ellipse de confiance à 95\% sur les données d'entraînement.
+Fichier : \texttt{fig5\_biplot\_acp.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+Ce graphique est un outil d'exploration, non de validation. Sa pertinence
+est modérée car les deux premières composantes ne capturent généralement
+qu'une fraction de la variance totale (typiquement 40 à 60\,\% selon la
+structure des données BEAC), et les anomalies les plus intéressantes peuvent
+vivre dans les composantes 3 à 5. Il est utile pour trois usages limités :
+obtenir une première impression visuelle de la séparabilité temporelle des
+données (les mois de 2020 sont-ils visiblement isolés des mois de 2010 ?) ;
+identifier les indicateurs qui dominent les deux premières composantes ;
+et vérifier qu'aucun artefact de calcul ne produit des projections aberrantes.
+
+\textit{Réserve importante.} Ce graphique ne doit pas être utilisé comme
+argument de validation LOF  les points visuellement isolés dans le plan
+CP1/CP2 ne sont pas nécessairement ceux que le LOF identifie comme anomaux
+dans l'espace complet à $k$ dimensions.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~2  Calibration LOF, usage exploratoire.} Ce graphique est
+produit après le calcul de la RPCA et avant le calcul des scores LOF.
+Il est consulté une seule fois à titre exploratoire. Il n'est pas inclus
+dans le rapport opérationnel final à la BEAC.
+
+\subsubsection{Données requises}
+
+Composantes RPCA calculées sur la fenêtre d'entraînement. Projections des
+195 observations sur CP1 et CP2. Loadings des 55 indicateurs.
+
+\subsubsection{Décision supportée}
+
+Exploration visuelle préliminaire. Identification des indicateurs dominants
+dans l'espace réduit. Aucune décision méthodologique ne repose
+exclusivement sur ce graphique.
+
+\textbf{Priorité : Complémentaire.}
+
+\subsection{Fig.~6  Projection UMAP}
+
+\subsubsection{Description}
+
+Projection bidimensionnelle des 195 observations par UMAP
+(\textit{Uniform Manifold Approximation and Projection}), colorée par
+score LOF* calculé sur la fenêtre complète. L'échelle de couleur va du
+bleu (score LOF* faible, point normal) au rouge foncé (score LOF* élevé,
+anomalie). Les mois des événements documentés (COVID-19, crise pétrolière)
+sont annotés.
+
+\placeholder{Fig. 6  Projection UMAP colorée par score LOF*}{
+Nuage UMAP bidimensionnel. Colormap : bleu (LOF* bas) → rouge (LOF* élevé).
+Points annotés : mars 2020, déc. 2015, et les 5 scores les plus élevés.
+Paramètres UMAP : n\_neighbors=15, min\_dist=0.1, metric=euclidean.
+Note : non-déterministe, fixer random\_state.
+Fichier : \texttt{fig6\_projection\_umap.pdf}
+}
+
+\subsubsection{Pertinence analytique et réserves méthodologiques}
+
+UMAP est un outil de visualisation exploratoire puissant mais son usage
+dans ce contexte requiert deux réserves explicites documentées dans les
+documents méthodologiques compagnons.
+
+\textit{Réserve 1  Non-déterminisme.} UMAP produit des résultats
+différents selon l'initialisation aléatoire. La graine aléatoire
+(\texttt{random\_state}) doit être fixée et documentée pour garantir la
+reproductibilité (contrainte C5 du pipeline LOF). Deux exécutions avec
+des graines différentes produiront des projections visuellement différentes
+même si les scores LOF* sont identiques.
+
+\textit{Réserve 2  Distorsion des distances globales.} UMAP préserve
+les structures locales mais distord les distances globales. Deux points
+visuellement proches dans la projection UMAP peuvent être distants dans
+l'espace à $k$ dimensions où le LOF calcule ses scores. Ce graphique
+est une visualisation, non une validation. Il ne doit pas être présenté
+comme une confirmation de la cohérence géométrique des scores LOF.
+
+Dans ces limites, UMAP apporte une information visuelle utile que le biplot
+ACP ne peut pas fournir : la capture des structures non-linéaires locales.
+Si les mois de COVID-19 forment un cluster visuellement isolé dans la
+projection UMAP, c'est une indication qualitative de leur atypicité 
+mais seulement qualitative.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~2  Calibration LOF, usage exploratoire.} Ce graphique est
+produit après le calcul des scores LOF* sur la fenêtre d'entraînement. Il
+est consulté à titre exploratoire et placé en annexe du rapport interne,
+avec la note méthodologique sur ses limites. Il n'est pas inclus dans le
+rapport opérationnel final à la BEAC.
+
+\subsubsection{Données requises}
+
+Résidus normalisés $x_{i,t}^*$ sur la période complète (2001--2026).
+Scores LOF* calculés. Paramètres UMAP fixés et documentés.
+
+\subsubsection{Décision supportée}
+
+Exploration visuelle non-linéaire des structures de données. Aucune décision
+méthodologique ou opérationnelle ne repose sur ce graphique.
+
+\textbf{Priorité : Complémentaire (annexe exploratoire uniquement).}
+
+\subsection{Fig.~7  Profils LOF(MinPts)}
+
+\subsubsection{Description}
+
+Pour les 20 observations ayant reçu les scores LOF* les plus élevés, tracer
+$\mathrm{LOF}_{\mathrm{MinPts}}(t)$ en fonction de MinPts pour
+$\mathrm{MinPts} \in [10, 30]$. Chaque observation est une courbe distincte.
+Une ligne horizontale indique le seuil IQR $\tau$. Les observations dont
+la courbe reste au-dessus de $\tau$ sur toute la plage sont colorées en
+rouge foncé (anomalies robustes) ; celles dont la courbe croise $\tau$
+sont colorées en orange (anomalies sensibles).
+
+\placeholder{Fig. 7  Profils LOF(MinPts) pour les top-20 anomalies}{
+20 courbes, axe X : MinPts de 10 à 30, axe Y : score LOF(MinPts).
+Courbes rouges : score > $\tau$ sur toute la plage (anomalies robustes).
+Courbes oranges : score > $\tau$ seulement sur partie de la plage.
+Ligne horizontale rouge pointillée : seuil $\tau$ (IQR rule).
+Reproduction de la Fig. 8 de Breunig et al. (2000) sur données BEAC.
+Fichier : \texttt{fig7\_profils\_lof\_minpts.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+C'est le graphique de validation méthodologique le plus important du
+pipeline LOF. Il reproduit directement la Figure~8 de Breunig et al.\
+(2000) sur les données BEAC et démontre empiriquement deux propriétés
+fondamentales documentées dans le document méthodologique LOF. D'une part,
+la non-monotonicité du LOF en fonction de MinPts : les courbes ne sont pas
+monotones, confirmant que le score d'une même observation peut augmenter
+ou diminuer selon le voisinage considéré. D'autre part, la robustesse des
+anomalies les plus sévères : si les 5 à 10 anomalies les plus importantes
+maintiennent un score élevé sur toute la plage $[10, 30]$, la stratégie
+de la plage de valeurs est validée empiriquement sur ces données.
+
+Ce graphique est également l'outil de calibration de la plage : si aucune
+anomalie ne maintient un score élevé sur toute la plage, les bornes doivent
+être révisées.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~2  Calibration LOF.} Ce graphique est produit lors de la
+calibration de MinPts, sur la fenêtre d'entraînement. Il valide la plage
+$[10, 30]$ retenue et identifie les anomalies robustes vs sensibles avant
+l'application sur la fenêtre de test. Il est inclus dans le rapport interne
+de validation, pas dans le rapport opérationnel BEAC.
+
+\subsubsection{Données requises}
+
+Calcul de $\mathrm{LOF}_{\mathrm{MinPts}}(t)$ pour chaque valeur entière
+de MinPts dans $[10, 30]$ sur la fenêtre d'entraînement. Score maximum
+$\mathrm{LOF}^*(t)$ et seuil $\tau$.
+
+\subsubsection{Décision supportée}
+
+Validation de la plage $[\mathrm{MinPts}_{\mathrm{LB}},
+\mathrm{MinPts}_{\mathrm{UB}}]$. Distinction anomalies robustes (rouge) vs
+anomalies sensibles (orange). Calibration du seuil $\tau$.
+
+\textbf{Priorité : Essentiel (pipeline LOF).}
+
+\subsection{Fig.~8  Distribution empirique des scores LOF*}
+
+\subsubsection{Description}
+
+Histogramme des scores $\mathrm{LOF}^*(t)$ sur la fenêtre d'entraînement,
+avec une estimation par noyau (KDE) superposée. Trois lignes verticales
+annotées : médiane, seuil IQR ($\tau_{\mathrm{IQR}}$) et seuil au
+95\textsuperscript{e} percentile ($\tau_{95}$). Les scores dépassant
+$\tau_{\mathrm{IQR}}$ sont colorés en orange ; ceux dépassant les deux
+seuils simultanément en rouge (anomalies robustes).
+
+\placeholder{Fig. 8  Distribution empirique des scores LOF*}{
+Histogramme (bins=30) + KDE. Ligne verte : médiane. Ligne orange :
+$\tau_{\mathrm{IQR}} = Q_3 + 1.5 \times \mathrm{IQR}$. Ligne rouge :
+$\tau_{95}$ (percentile 95). Zone orange : $\tau_{\mathrm{IQR}} < \mathrm{LOF*}
+< \tau_{95}$ (anomalies marginales). Zone rouge : $\mathrm{LOF*} > \tau_{95}$
+(anomalies robustes). Annotation : nombre de points dans chaque zone.
+Fichier : \texttt{fig8\_distribution\_lof.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+Ce graphique remplit deux fonctions. D'une part, il justifie visuellement
+les deux seuils retenus en montrant leur position dans la distribution
+empirique réelle des scores : si $\tau_{\mathrm{IQR}}$ et $\tau_{95}$
+coïncident ou sont très proches, les deux critères convergent et les
+anomalies robustes sont clairement délimitées. Si les deux seuils divergent
+fortement, la zone intermédiaire est large, indiquant une population
+d'anomalies marginales à examiner avec expertise domaine. D'autre part,
+la forme de la distribution elle-même est informative : une distribution
+unimodale indique une population homogène de comportements normaux avec
+quelques outliers ; une distribution bimodale suggère deux sous-populations
+distinctes (par exemple régime pré et post-COVID), information utile pour
+la surveillance macroprudentielle.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~2  Calibration LOF.} Ce graphique est produit après le
+calcul des scores LOF* sur la fenêtre d'entraînement, pour fixer les seuils
+$\tau$ avant l'application sur la fenêtre de test. Les seuils calculés sur
+l'entraînement sont appliqués sans recalcul sur le test.
+
+\subsubsection{Données requises}
+
+Scores $\mathrm{LOF}^*(t)$ sur la fenêtre d'entraînement
+(décembre~2001 -- novembre~2018). Calcul de $Q_1$, $Q_3$, IQR, $\tau_{\mathrm{IQR}}$
+et $\tau_{95}$.
+
+\subsubsection{Décision supportée}
+
+Fixation des seuils de détection $\tau_{\mathrm{IQR}}$ et $\tau_{95}$.
+Évaluation de la proportion d'anomalies robustes vs marginales sur
+l'entraînement. Détection d'éventuelles sous-populations dans les données
+d'entraînement.
+
+\textbf{Priorité : Essentiel (pipeline LOF).}
+
+\subsection{Fig.~E  Intervalles de confiance BiVAT par Conformal
+Prediction (calibration)}
+
+\subsubsection{Description}
+
+Graphique en ligne du score discriminant BiVAT
+$s^{\mathrm{discrim}}_t$ sur la fenêtre de calibration
+(décembre~2018 -- décembre~2019), avec les enveloppes de confiance CP à
+90\,\% et 95\,\% superposées. Une ligne horizontale indique le quantile
+empirique $\hat{q}_{1-\alpha}$ calculé sur cette fenêtre. Les mois dont
+le score dépasse $\hat{q}_{1-\alpha}$ sont annotés.
+
+\placeholder{Fig. E  Intervalles CP BiVAT (fenêtre de calibration)}{
+Axe X : mois de déc. 2018 à déc. 2019 (13 mois). Axe Y : score
+$s^{\mathrm{discrim}}_t$. Courbe centrale bleue : score BiVAT.
+Enveloppe bleue claire : intervalle CP 90\%. Enveloppe bleue foncée :
+intervalle CP 95\%. Ligne pointillée rouge : $\hat{q}_{0.9}$ (seuil
+d'anomalie). Points au-dessus du seuil en rouge.
+Fichier : \texttt{figE\_intervalles\_cp\_calibration.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+Ce graphique valide le bon fonctionnement de la Conformal Prediction sur
+la fenêtre de calibration. Il permet de vérifier empiriquement que le
+quantile $\hat{q}_{1-\alpha}$ est bien calibré : si exactement
+$(1-\alpha) \times 100\,\%$ des observations de calibration sont en dessous
+de $\hat{q}_{1-\alpha}$, la garantie formelle de coverage est validée sur
+cet échantillon. Si le coverage observé s'écarte significativement du niveau
+nominal, la Small Sample Beta Correction (SSBC) doit être ajustée.
+
+Ce graphique répond également à la lacune~L3 du LOF de façon visuelle :
+il montre ce qu'un score d'anomalie avec intervalles de confiance apporte
+par rapport à un score scalaire déterministe  non seulement un rang
+ordinal, mais une mesure de la certitude associée à chaque décision.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~2  Calibration BiVAT.} Ce graphique est produit lors de
+la calibration de la Conformal Prediction sur la fenêtre de calibration.
+Il valide le quantile $\hat{q}_{1-\alpha}$ avant application sur la fenêtre
+de test. Inclus dans le rapport interne de validation.
+
+\subsubsection{Données requises}
+
+Scores BiVAT $s^{\mathrm{discrim}}_t$ sur la fenêtre de calibration.
+Quantile empirique $\hat{q}_{1-\alpha}$ avec SSBC. Enveloppes CP à 90\,\%
+et 95\,\%.
+
+\subsubsection{Décision supportée}
+
+Validation du coverage empirique de la CP sur la fenêtre de calibration.
+Fixation du quantile $\hat{q}_{1-\alpha}$ pour la fenêtre de test.
+Ajustement éventuel de la SSBC si le coverage observé diverge du niveau
+nominal.
+
+\textbf{Priorité : Essentiel (pipeline BiVAT).}
+
+% ════════════════════════════════════════════════════════════════
+\section{Phase 3  Production et Interprétation des Résultats}
+
+Cette phase regroupe les graphiques produits sur la fenêtre de test
+(mars~2020 -- mars~2026) après application des modèles calibrés. Ce sont
+les graphiques qui constituent le rapport opérationnel final destiné aux
+équipes de surveillance BEAC. Ils répondent à trois questions distinctes :
+quand les anomalies se produisent-elles ? Quels indicateurs les portent ?
+Sont-elles idiosyncratiques (un pays) ou systémiques (plusieurs pays) ?
+
+\subsection{Fig.~9  Boxplot des scores LOF* par année}
+
+\subsubsection{Description}
+
+Boxplot des scores $\mathrm{LOF}^*(t)$ groupés par année civile, sur la
+période complète 2001--2026. La ligne centrale de chaque boîte est la
+médiane annuelle ; les bords de la boîte sont $Q_1$ et $Q_3$ ; les
+moustaches s'étendent à $1{,}5 \times \mathrm{IQR}$ ; les points au-delà
+sont des outliers de l'année considérée. Les lignes horizontales $\tau_{\mathrm{IQR}}$
+et $\tau_{95}$ sont superposées pour référence. Les années contenant au
+moins une anomalie robuste sont colorées en rouge.
+
+\placeholder{Fig. 9  Boxplot des scores LOF* par année}{
+25 boîtes (2001 à 2026). Axe X : année. Axe Y : score LOF*. Ligne rouge
+pointillée : $\tau_{\mathrm{IQR}}$. Ligne orange pointillée : $\tau_{95}$.
+Boîtes rouges : années avec au moins 1 anomalie robuste. Annotation :
+nombre d'anomalies robustes par année au-dessus de chaque boîte rouge.
+Fichier : \texttt{fig9\_boxplot\_lof\_annee.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+Ce graphique fournit une vue temporelle agrégée qui révèle si les anomalies
+se concentrent dans des années spécifiques ou sont distribuées uniformément.
+C'est la première validation externe qualitative : si les boîtes de 2020
+et de 2015--2016 sont significativement plus hautes que les autres, la
+détection LOF est cohérente avec les chocs macroéconomiques documentés.
+Il révèle également la variabilité intra-annuelle : une boîte 2020 très
+haute avec une grande dispersion indique que certains mois de 2020 sont
+très anomaux et d'autres moins  information utile pour identifier le pic
+du choc COVID-19 dans les données BEAC.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~3  Production des résultats LOF.} Ce graphique est produit
+après le calcul des scores LOF* sur la fenêtre de test complète (mais peut
+aussi incorporer la fenêtre d'entraînement pour une vue 2001--2026). Il
+est inclus dans le rapport opérationnel comme vue d'ensemble temporelle.
+
+\subsubsection{Données requises}
+
+Scores $\mathrm{LOF}^*(t)$ sur la période complète 2001--2026.
+Seuils $\tau_{\mathrm{IQR}}$ et $\tau_{95}$ calculés sur l'entraînement.
+
+\subsubsection{Décision supportée}
+
+Identification des années concentrant les anomalies. Première validation
+externe qualitative par concordance avec les événements documentés.
+Présentation synthétique pour un auditeur BEAC non spécialiste du ML.
+
+\textbf{Priorité : Important.}
+
+\subsection{Fig.~10  Série temporelle des scores LOF*(t)}
+
+\subsubsection{Description}
+
+Graphique en ligne du score $\mathrm{LOF}^*(t)$ sur l'axe temporel
+complet 2001--2026. Deux lignes horizontales : $\tau_{\mathrm{IQR}}$
+(orange) et $\tau_{95}$ (rouge). Les points au-dessus de $\tau_{95}$
+(anomalies robustes) sont annotés avec leur date et l'événement
+macroéconomique correspondant si disponible. La zone entre $\tau_{\mathrm{IQR}}$
+et $\tau_{95}$ est colorée en orange pâle (anomalies marginales). La zone
+au-dessus de $\tau_{95}$ est colorée en rouge pâle.
+
+\placeholder{Fig. 10  Série temporelle LOF*(t)}{
+Ligne continue bleue : score LOF*(t). Zone orange pâle : anomalies marginales.
+Zone rouge pâle : anomalies robustes. Annotations : ``Mars 2020  COVID-19'',
+``Déc. 2015  Nadir crise pétrolière'', et les 5 scores les plus élevés non
+documentés avec point d'interrogation. Axe X : mois 2001--2026.
+Axe Y : score LOF*.
+Fichier : \texttt{fig10\_serie\_temporelle\_lof.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+C'est le graphique central du rapport opérationnel. Il synthétise
+l'ensemble des résultats LOF en une visualisation unique lisible par un
+superviseur BEAC sans formation en machine learning. Chaque pic correspond
+à un mois potentiellement anomal ; les annotations font le lien avec les
+événements économiques documentés. Les anomalies non annotées (pics sans
+événement connu) sont les candidates les plus intéressantes : elles
+représentent soit des événements non documentés dans la littérature
+disponible, soit des erreurs de collecte, soit des artefacts du modèle 
+trois hypothèses à investiguer par expertise domaine.
+
+La présence de la zone intermédiaire (anomalies marginales entre les deux
+seuils) est une innovation par rapport à un graphique seuil unique : elle
+traduit visuellement la gradation de l'anomalie et la nécessité d'une
+expertise différenciée selon le niveau de confiance.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~3  Production des résultats LOF.} C'est le premier
+graphique consulté par un superviseur BEAC dans le rapport opérationnel.
+Il est produit après le calcul des scores LOF* sur la fenêtre de test et
+peut être mis à jour mensuellement lors d'une utilisation opérationnelle
+continue.
+
+\subsubsection{Données requises}
+
+Scores $\mathrm{LOF}^*(t)$ sur la période complète 2001--2026.
+Seuils $\tau_{\mathrm{IQR}}$ et $\tau_{95}$. Liste des événements
+macroéconomiques documentés CEMAC avec leurs dates.
+
+\subsubsection{Décision supportée}
+
+Identification des mois anomaux et de leur sévérité. Première investigation
+des pics non annotés. Mise à jour mensuelle de la surveillance. Rapport
+opérationnel principal à la BEAC.
+
+\textbf{Priorité : Essentiel.}
+
+\subsection{Fig.~11  Superposition LOF + résidus STL + série brute}
+
+\subsubsection{Description}
+
+Pour chaque anomalie robuste identifiée, un graphique à trois panneaux
+superposés sur la même fenêtre temporelle de $\pm 24$ mois autour du mois
+anomal : panneau supérieur  série brute $x_{i^*,t}$ de l'indicateur
+principal contributeur ; panneau médian  résidu STL $R_{i^*,t}$ du
+même indicateur ; panneau inférieur  score $\mathrm{LOF}^*(t)$ avec
+seuil $\tau$. Le mois anomal est indiqué par une ligne verticale rouge.
+
+\placeholder{Fig. 11  Superposition LOF + résidu STL + série brute}{
+3 panneaux pour chaque anomalie majeure. Fenêtre : $t-24$ à $t+24$ mois.
+Panneau 1 (haut) : série brute $x_{i^*,t}$ en milliards FCFA.
+Panneau 2 (milieu) : résidu $R_{i^*,t}$ (normalisé MAD).
+Panneau 3 (bas) : score LOF*(t) avec lignes $\tau_{\mathrm{IQR}}$ et
+$\tau_{95}$. Ligne rouge verticale : mois anomal.
+Fichier : \texttt{fig11\_superposition\_lof\_indicateur\_[mois].pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+Ce graphique démontre visuellement un point méthodologique central : le
+LOF réagit à la déviation dans l'espace des résidus normalisés, pas au
+niveau absolu de la série brute. En montrant simultanément les trois niveaux
+de représentation (série brute, résidu STL, score LOF), il rend
+pédagogiquement visible pourquoi le prétraitement STL est indispensable.
+Un pic dans le résidu sans pic apparent dans la série brute correspond
+typiquement à une anomalie contextuelle (le niveau absolu est normal mais
+la dynamique est atypique)  précisément le type d'anomalie que le LOF
+peut capturer mais que la simple règle des $n$ sigmas sur données brutes
+raterait.
+
+\textit{Correction par rapport au corpus initial.} Le corpus initial
+proposait de superposer LOF avec la série brute uniquement. Superposer
+avec les résidus STL est plus informatif et méthodologiquement cohérent :
+c'est sur les résidus que le LOF opère.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~3  Interprétation des résultats LOF.} Ce graphique est
+produit après identification des anomalies robustes, une instance par
+anomalie. Il est inclus dans le rapport opérationnel comme annexe
+d'interprétation pour chaque alerte.
+
+\subsubsection{Données requises}
+
+Scores LOF*(t), résidus STL $R_{i,t}$, séries brutes $x_{i,t}$.
+Identification de l'indicateur principal contributeur (via Fig.~13 ou
+Fig.~F de l'attribution SHAP BiVAT). Seuils $\tau$.
+
+\subsubsection{Décision supportée}
+
+Interprétation économique de chaque anomalie robuste. Distinction entre
+anomalie de niveau (pic dans la série brute) et anomalie de dynamique
+(pic dans le résidu sans pic apparent dans la brute). Documentation des
+alertes pour l'audit COBAC.
+
+\textbf{Priorité : Important.}
+
+\subsection{Fig.~12  Bar chart horizontal des indicateurs contributeurs}
+
+\subsubsection{Description}
+
+Pour chaque mois anomal, un bar chart horizontal trié par contribution
+décroissante, montrant les 15 indicateurs dont les résidus normalisés
+sont les plus élevés en valeur absolue au mois $t$. Les barres positives
+(déviation à la hausse) sont en rouge ; les barres négatives (déviation
+à la baisse) sont en bleu. Les valeurs numériques sont affichées en bout
+de barre.
+
+\placeholder{Fig. 12  Bar chart des indicateurs contributeurs}{
+Bar chart horizontal. 15 indicateurs, triés par $|R_{i,t}^*|$ décroissant.
+Barres rouges : $R_{i,t}^* > 0$. Barres bleues : $R_{i,t}^* < 0$.
+Valeurs numériques en bout de barre. Titre : ``Indicateurs contributeurs
+ [Mois anomal]''. Un graphique par mois anomal.
+Fichier : \texttt{fig12\_contributeurs\_[mois].pdf}
+}
+
+\subsubsection{Pertinence analytique et correction du corpus initial}
+
+Le corpus initial proposait un radar chart pour cette fonction.
+Le bar chart horizontal lui est préféré pour trois raisons documentées.
+D'une part, la lisibilité : avec 10 à 15 indicateurs aux noms longs de
+type \texttt{Crédits\_ENF\_MN}, un radar chart est illisible pour un
+auditeur BEAC. D'autre part, la précision : un bar chart permet de lire
+les valeurs numériques exactes, critère d'auditabilité requis par les
+exigences COBAC. D'autre part enfin, la distinction positive/négative :
+un radar chart ne distingue pas visuellement les déviations à la hausse
+des déviations à la baisse, information économiquement fondamentale (une
+contraction des crédits et une expansion des dépôts sont deux signaux
+opposés).
+
+Le radar chart peut être conservé en complément comme visualisation
+synthétique pour les présentations, mais le bar chart est l'outil d'audit.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~3  Interprétation économique des résultats LOF.}
+Ce graphique est produit pour chaque anomalie robuste, en complément de
+Fig.~11. Il répond à la question : quels indicateurs du bilan portent
+l'anomalie ? Il est inclus dans le rapport opérationnel comme outil
+d'interprétation économique pour chaque alerte.
+
+\subsubsection{Données requises}
+
+Résidus normalisés $R_{i,t}^*$ au mois anomal $t$ pour les 55 indicateurs.
+Tri par valeur absolue décroissante. Identification des 15 indicateurs
+les plus actifs.
+
+\subsubsection{Décision supportée}
+
+Attribution de l'anomalie aux indicateurs IFS contributeurs. Distinction
+entre déviations positives et négatives. Documentation pour l'audit COBAC.
+Formulation de l'hypothèse économique (erreur de collecte vs événement
+réel).
+
+\textbf{Priorité : Essentiel.}
+
+\subsection{Fig.~13  Heatmap des anomalies (indicateurs × mois anomaux)}
+
+\subsubsection{Description}
+
+Matrice de chaleur de dimensions ($55 \times N_{\mathrm{anomalies}}$), où
+chaque colonne est un mois anomal identifié (score LOF* > $\tau_{\mathrm{IQR}}$)
+et chaque ligne est un indicateur IFS. La couleur encode l'intensité du
+résidu normalisé $R_{i,t}^*$ : rouge foncé (déviation positive forte),
+bleu foncé (déviation négative forte), blanc (résidu nul). Les indicateurs
+sont triés par clustering hiérarchique sur les colonnes anomales.
+
+\placeholder{Fig. 13  Heatmap des anomalies (indicateurs × mois anomaux)}{
+Matrice (55 lignes × $N$ colonnes). Colormap divergente :
+bleu foncé (résidu $< -3$) → blanc (résidu $= 0$) → rouge foncé (résidu $> 3$).
+Dendrogramme sur les lignes (clustering indicateurs). Annotations sur les
+colonnes : date et événement économique. Barre latérale droite : famille
+IFS (Crédits, Dépôts, Titres\ldots)
+Fichier : \texttt{fig13\_heatmap\_anomalies.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+C'est le graphique d'interprétation économique le plus riche du système
+visuel. Il répond simultanément à deux questions : quels mois sont anomaux
+(colonnes) ET quels indicateurs portent la déviation à chaque mois anomal
+(lignes). La lecture croisée est immédiate pour un auditeur BEAC : si les
+colonnes de 2020 montrent des déviations rouges concentrées sur les lignes
+\texttt{Crédits} et des déviations bleues sur les lignes \texttt{Dépôts},
+le choc COVID-19 a simultanément contracté les crédits et gonflé les dépôts
+de précaution  interprétation économique directement exploitable.
+
+Le clustering hiérarchique sur les lignes fait apparaître naturellement les
+blocs d'indicateurs co-anomaux, révélant la structure des chocs dans le bilan
+2SR. Ce graphique satisfait directement les exigences d'auditabilité COBAC
+documentées dans le document BiVAT (BIS FSI 2024, ECB 2025).
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~3  Interprétation économique globale.} Ce graphique est
+produit après identification de l'ensemble des mois anomaux sur la fenêtre
+de test. Il est inclus dans le rapport opérationnel comme vue d'ensemble
+de l'interprétation économique des anomalies.
+
+\subsubsection{Données requises}
+
+Résidus normalisés $R_{i,t}^*$ pour tous les mois anomaux identifiés et
+tous les 55 indicateurs. Liste des mois anomaux (score LOF* > $\tau_{\mathrm{IQR}}$).
+
+\subsubsection{Décision supportée}
+
+Interprétation économique des anomalies par indicateur. Identification
+des blocs d'indicateurs co-anomaux (clusters de lignes). Documentation
+pour l'audit COBAC. Formulation des hypothèses économiques sur la nature
+des chocs.
+
+\textbf{Priorité : Essentiel.}
+
+\subsection{Fig.~14  Carte de chaleur inter-pays}
+
+\subsubsection{Description}
+
+Matrice de chaleur de dimensions (mois × pays CEMAC), où chaque cellule
+encode le score LOF* normalisé du pays $p$ au mois $t$, ramené sur une
+échelle commune $[0, 1]$ pour permettre la comparaison inter-pays. Les
+six pays (Cameroun, Congo, Gabon, Guinée équatoriale, RCA, Tchad) sont
+en colonnes ; les mois 2001--2026 en lignes. Les cellules dépassant le
+seuil normalisé correspondant à $\tau_{\mathrm{IQR}}$ sont encadrées
+en noir. Un panneau auxiliaire à droite indique, pour chaque mois, le
+nombre de pays dépassant simultanément leur seuil national.
+
+\placeholder{Fig. 14  Carte de chaleur inter-pays (mois × pays CEMAC)}{
+Matrice (195 lignes × 6 colonnes). Colormap : blanc (score normalisé 0) →
+rouge foncé (score normalisé 1). Encadrés noirs : cellules > seuil normalisé.
+Panneau droit : nombre de pays en alerte simultanée (barres grises).
+Ligne pointillée rouge : seuil systémique ($m \geq 3$ pays simultanément).
+Fichier : \texttt{fig14\_heatmap\_interpays.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+Ce graphique implémente visuellement le niveau~4 du protocole de validation
+LOF documenté dans le document méthodologique LOF : identification des
+anomalies systémiques CEMAC ($m \geq 3$ pays simultanément au-dessus de
+leur seuil). C'est la distinction fondamentale entre une anomalie
+idiosyncratique (un seul pays, vraisemblablement erreur de collecte ou
+choc local) et une anomalie systémique (plusieurs pays, vraisemblablement
+choc macroéconomique CEMAC). Le panneau auxiliaire droite rend cette
+distinction immédiatement lisible sans calcul supplémentaire.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~3  Production des résultats LOF, validation inter-pays.}
+Ce graphique est produit après le calcul des scores LOF* sur les 12 fichiers
+(6 pays × 2 volets Actif/Passif). Il est inclus dans le rapport opérationnel
+comme outil de détection des anomalies systémiques CEMAC.
+
+\subsubsection{Données requises}
+
+Scores LOF* pour les 6 pays (Actif ou Passif selon le volet analysé).
+Normalisation inter-pays des scores sur $[0, 1]$ (min-max sur chaque pays
+séparément). Seuils nationaux $\tau_p$ pour chaque pays.
+
+\subsubsection{Décision supportée}
+
+Identification des anomalies systémiques CEMAC ($m \geq 3$ pays). Distinction
+anomalie idiosyncratique vs systémique. Hiérarchisation des alertes par
+niveau de risque macroprudentiel. Transmission à la surveillance régionale
+BEAC pour les anomalies systémiques.
+
+\textbf{Priorité : Essentiel.}
+
+\subsection{Fig.~B  Concordance Actif--Passif par pays}
+
+\subsubsection{Description}
+
+Pour chaque pays, un graphique à deux panneaux superposés : score LOF*
+Actif (panneau supérieur) et score LOF* Passif (panneau inférieur), sur
+le même axe temporel 2001--2026. Les deux panneaux partagent l'axe des
+abscisses et le même seuil $\tau$. Les mois où les deux panneaux dépassent
+simultanément $\tau$ sont colorés en rouge (anomalie concordante) ; les
+mois où un seul panneau dépasse $\tau$ sont colorés en orange (anomalie
+discordante).
+
+\placeholder{Fig. B  Concordance Actif--Passif par pays}{
+2 panneaux empilés. Panneau haut : LOF* Actif. Panneau bas : LOF* Passif.
+Lignes $\tau_{\mathrm{IQR}}$ sur les deux panneaux. Zones rouges :
+concordance (les deux > $\tau$). Zones oranges : discordance (un seul > $\tau$).
+Annotation des concordances : ``Événement économique réel probable.''
+Annotation des discordances : ``Vérification comptable requise.''
+6 graphiques (un par pays CEMAC).
+Fichier : \texttt{figB\_concordance\_actif\_passif\_[pays].pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+Ce graphique implémente le niveau~5 du protocole de validation LOF
+(cohérence Actif--Passif). L'identité comptable
+$\mathrm{Total\;Actif} = \mathrm{Total\;Passif}$ constitue une contrainte
+de validation interne au dataset BEAC. Une anomalie concordante (signal
+sur les deux volets) indique un événement économique réel affectant la
+structure du bilan dans son ensemble. Une anomalie discordante suggère
+prioritairement une erreur de collecte ou un problème de réconciliation
+comptable. Cette distinction est documentée dans le document de prétraitement
+commun (section~2.1) et opérationnalisée ici visuellement.
+
+Ce graphique est absent du corpus initial et constitue une contribution
+originale du système visuel, directement liée à la structure multi-fichiers
+du dataset BEAC (12 fichiers = 6 pays × 2 volets).
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~3  Validation des résultats LOF, niveau Actif--Passif.}
+Ce graphique est produit après le calcul des scores LOF* sur les 12 fichiers.
+Il est inclus dans le rapport opérationnel comme outil de triage des alertes
+(événement économique vs erreur de collecte).
+
+\subsubsection{Données requises}
+
+Scores LOF* Actif et LOF* Passif pour chaque pays, sur la période complète.
+Seuils $\tau_{\mathrm{IQR}}$ et $\tau_{95}$ calculés séparément pour chaque
+fichier.
+
+\subsubsection{Décision supportée}
+
+Triage des alertes entre événements économiques réels (anomalies concordantes)
+et problèmes de collecte (anomalies discordantes). Hiérarchisation des
+investigations : les anomalies concordantes ont priorité sur les discordantes.
+Signalement des anomalies discordantes à l'équipe de collecte BEAC.
+
+\textbf{Priorité : Essentiel.}
+% ════════════════════════════════════════════════════════════════
+\section{Phase 4  Comparaison Inter-modèles et Décision Finale}
+
+Cette phase regroupe les graphiques produits après l'exécution des deux
+modèles sur la fenêtre de test. Ils confrontent les résultats LOF et BiVAT,
+identifient les concordances et les divergences, et produisent les éléments
+visuels nécessaires à la décision opérationnelle finale. Ces graphiques
+constituent la valeur ajoutée principale du système comparatif à deux
+modèles par rapport à un déploiement mono-modèle.
+
+\subsection{Fig.~A bis  Comparaison LOF vs BiVAT dans le temps}
+\label{subsec:figD}
+
+\subsubsection{Description}
+
+Graphique à deux courbes superposées sur le même axe temporel
+(mars~2020 -- mars~2026) : score $\mathrm{LOF}^*(t)$ normalisé sur $[0,1]$
+(courbe bleue) et score discriminant BiVAT $s^{\mathrm{discrim}}_t$ normalisé
+sur $[0,1]$ (courbe rouge). Les seuils normalisés correspondant à
+$\tau_{\mathrm{IQR}}$ (LOF) et $\hat{q}_{1-\alpha}$ (BiVAT) sont tracés
+en lignes pointillées de la couleur de chaque modèle. Quatre zones de
+couleur sont définies : vert pâle (les deux modèles sous leur seuil 
+accord sur la normalité), rouge pâle (les deux modèles au-dessus de leur
+seuil  accord sur l'anomalie), orange gauche (LOF seul au-dessus 
+anomalie ponctuelle non temporelle), orange droit (BiVAT seul au-dessus 
+anomalie contextuelle ou collective non détectée par LOF).
+
+\placeholder{Fig. D  Comparaison LOF vs BiVAT dans le temps}{
+Deux courbes normalisées sur [0,1]. Courbe bleue : LOF*(t)/max(LOF*).
+Courbe rouge : $s^{\mathrm{discrim}}_t$/max($s^{\mathrm{discrim}}$).
+Zone verte pâle : accord normalité. Zone rouge pâle : accord anomalie.
+Zone orange gauche : LOF seul. Zone orange droit : BiVAT seul.
+Annotations : événements documentés. Axe X : mars 2020 -- mars 2026.
+Fichier : \texttt{figD\_comparaison\_lof\_bivat.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+C'est le graphique de synthèse comparative centrale de l'étude. Il
+implémente visuellement les métriques M1 (Precision@k), M2 (rang des
+anomalies connues) et M3 (cohérence inter-modèles) documentées dans les
+deux documents méthodologiques compagnons. Les quatre zones colorées
+structurent la lecture de la comparaison.
+
+La zone verte (accord sur la normalité) valide la robustesse des deux
+modèles sur les périodes stables. La zone rouge (accord sur l'anomalie)
+identifie les alertes de niveau~1  les plus fiables car confirmées par
+deux approches radicalement différentes (densité locale vs reconstruction
+probabiliste). La zone orange gauche (LOF seul) identifie les anomalies
+ponctuelles détectées par LOF mais pas par BiVAT : ce sont typiquement des
+déviations isolées dans l'espace des résidus sans structure temporelle 
+potentiellement des erreurs de saisie. La zone orange droit (BiVAT seul)
+identifie les anomalies contextuelles ou collectives que le LOF rate
+structurellement en raison de la lacune~L1 : ce sont précisément les
+anomalies les plus pertinentes pour la surveillance macroprudentielle.
+
+Ce graphique rend visible empiriquement, sur les données BEAC réelles,
+l'écart de $-33{,}98$ points de F1 entre LOF et les méthodes temporelles
+documenté dans le document LOF (section~5.1, Table~\ref{tab:l1-benchmark}).
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~4  Comparaison inter-modèles.} Ce graphique est produit
+après l'application des deux modèles calibrés sur la fenêtre de test.
+C'est le premier graphique de la Phase~4, point d'entrée de la comparaison.
+Il est inclus dans le rapport opérationnel comme outil de décision finale.
+
+\subsubsection{Données requises}
+
+Scores $\mathrm{LOF}^*(t)$ sur la fenêtre de test. Scores BiVAT
+$s^{\mathrm{discrim}}_t$ sur la fenêtre de test. Normalisation min-max
+de chaque série de scores séparément. Seuils $\tau_{\mathrm{IQR}}$ (LOF)
+et $\hat{q}_{1-\alpha}$ (BiVAT) normalisés.
+
+\subsubsection{Décision supportée}
+
+Classification des alertes en quatre niveaux : accord normalité, accord
+anomalie (niveau~1), LOF seul (niveau~2a), BiVAT seul (niveau~2b).
+Hiérarchisation des investigations. Validation externe par concordance
+avec les événements documentés. Quantification de la métrique M3
+(cohérence inter-modèles).
+
+\textbf{Priorité : Essentiel.}
+
+\subsection{Fig.~E bis  Intervalles de confiance BiVAT sur la fenêtre
+de test}
+
+\subsubsection{Description}
+
+Graphique en ligne du score discriminant BiVAT $s^{\mathrm{discrim}}_t$
+sur la fenêtre de test (mars~2020 -- mars~2026), avec les enveloppes de
+confiance Conformal Prediction à 90\,\% et 95\,\% superposées. Le quantile
+empirique $\hat{q}_{1-\alpha}$ (calculé sur le calibration set) est tracé
+en ligne pointillée rouge. Les mois dont le score dépasse $\hat{q}_{1-\alpha}$
+sont annotés avec leur date. Les intervalles CP sont calculés par rolling-origin
+(section~6.3 du document de prétraitement commun). Une bande grisée indique
+les périodes de rupture de régime documentées où la CP pondérée est activée.
+
+\placeholder{Fig. E bis  Score BiVAT + intervalles CP (fenêtre de test)}{
+Axe X : mars 2020 -- mars 2026. Axe Y : score $s^{\mathrm{discrim}}_t$.
+Courbe rouge : score BiVAT. Enveloppe rouge claire : intervalle CP 90\%.
+Enveloppe rouge foncé : intervalle CP 95\%. Ligne pointillée rouge :
+$\hat{q}_{0.9}$. Points annotés : mois dépassant le seuil. Bande grise :
+mars 2020 -- déc. 2021 (rupture COVID, CP pondérée active).
+Fichier : \texttt{figE\_bis\_bivat\_cp\_test.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+Ce graphique constitue la réponse visuelle directe à la lacune~L3 du LOF
+(absence de quantification d'incertitude). Il montre ce qu'un score
+d'anomalie avec intervalles de confiance apporte par rapport au score scalaire
+déterministe LOF* : pour chaque mois, non seulement un rang ordinal, mais
+une mesure de la certitude associée à la décision. Un mois dont le score
+BiVAT dépasse $\hat{q}_{1-\alpha}$ mais dont l'intervalle inférieur de CP
+reste proche du seuil est une anomalie à surveillance  une anomalie dont
+le score central est élevé mais dont l'incertitude est grande. Un mois dont
+le score est très au-dessus du seuil ET dont l'intervalle inférieur dépasse
+aussi le seuil est une anomalie robuste à signalement immédiat.
+
+La bande grisée de CP pondérée sur la période COVID-19 rend visible
+l'adaptation du système aux ruptures de régime : les intervalles s'élargissent
+pendant cette période, reflétant fidèlement l'incertitude accrue du modèle.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~4  Production des résultats BiVAT.} Ce graphique est
+produit après l'application de BiVAT calibré sur la fenêtre de test et
+le calcul des intervalles CP par rolling-origin. Il est inclus dans le
+rapport opérationnel comme graphique principal BiVAT, en parallèle de
+Fig.~10 pour LOF.
+
+\subsubsection{Données requises}
+
+Scores BiVAT $s^{\mathrm{discrim}}_t$ sur la fenêtre de test. Quantile
+CP $\hat{q}_{1-\alpha}$ calculé sur le calibration set avec SSBC. Enveloppes
+rolling-origin CP à 90\,\% et 95\,\%. Indicateur de période de CP pondérée.
+
+\subsubsection{Décision supportée}
+
+Identification des mois anomaux BiVAT avec niveau de confiance associé.
+Classification : anomalie certaine (score + intervalle inférieur > seuil)
+vs anomalie ambiguë (score > seuil mais intervalle inférieur < seuil).
+Rapport opérationnel BiVAT principal à la BEAC.
+
+\textbf{Priorité : Essentiel.}
+
+\subsection{Fig.~F  Attribution SHAP par indicateur pour les top-5
+anomalies BiVAT}
+
+\subsubsection{Description}
+
+Pour les cinq mois les plus anomaux selon BiVAT (score
+$s^{\mathrm{discrim}}_t$ le plus élevé sur la fenêtre de test), un bar
+chart horizontal des valeurs DeepSHAP par indicateur IFS, trié par
+contribution absolue décroissante, affichant les 15 indicateurs les plus
+contributeurs. Les barres positives (contribution à la hausse du score
+d'anomalie) sont en rouge ; les barres négatives (contribution à la baisse)
+en bleu. Les valeurs SHAP normalisées sont exprimées en pourcentage de
+contribution totale. Un sous-titre indique le mois, le score BiVAT et le
+score LOF correspondant (pour comparaison inter-modèles).
+
+\placeholder{Fig. F  Attribution SHAP par indicateur (top-5 BiVAT)}{
+5 bar charts horizontaux (un par anomalie majeure BiVAT).
+15 indicateurs par graphique, triés par $|\phi_d|$ décroissant.
+Barres rouges : $\phi_d > 0$ (contribution positive à l'anomalie).
+Barres bleues : $\phi_d < 0$ (contribution négative).
+Valeurs en \% de contribution totale. Sous-titre : ``[Mois] 
+Score BiVAT : X.XX  Score LOF : Y.YY''.
+Fichier : \texttt{figF\_shap\_[mois].pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+Ce graphique constitue la réponse visuelle directe à la lacune~L4 du LOF
+(absence d'explicabilité par indicateur) et représente l'output opérationnel
+final le plus distinctif de BiVAT par rapport au LOF. Il produit exactement
+ce qu'exigent les standards réglementaires documentés dans le document BiVAT :
+BIS FSI Paper (2024), ECB Guide to Internal Models (2025) et SHARC
+(arXiv:2607.05484). Pour chaque anomalie majeure, un superviseur BEAC peut
+lire directement : ``l'anomalie de mars~2020 est attribuée à 67\,\% à la
+série \texttt{Crédits\_ENF} et à 22\,\% à \texttt{Dépôts\_transf}'' 
+information non disponible depuis le LOF.
+
+Le sous-titre indiquant le score LOF correspondant permet également de
+comparer directement les deux modèles pour chaque anomalie : si BiVAT
+attribue un score élevé à un mois et que LOF lui attribue un score faible,
+le graphique SHAP montre pourquoi  BiVAT a détecté une anomalie
+contextuelle dans la combinaison de plusieurs indicateurs, que le LOF
+dans l'espace réduit RPCA n'a pas vue.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~4  Interprétation des résultats BiVAT et comparaison.}
+Ce graphique est produit après identification des cinq anomalies les plus
+sévères de BiVAT sur la fenêtre de test. Il est inclus dans le rapport
+opérationnel comme annexe d'interprétation réglementaire pour chaque
+alerte BiVAT majeure.
+
+\subsubsection{Données requises}
+
+Valeurs DeepSHAP $\phi_d(\mathbf{x}_t)$ calculées pour chaque indicateur
+$d$ aux cinq mois anomaux les plus sévères. Scores BiVAT et LOF
+correspondants. Normalisation des valeurs SHAP en pourcentage de contribution
+totale.
+
+\subsubsection{Décision supportée}
+
+Attribution causale de chaque anomalie BiVAT aux indicateurs IFS
+contributeurs. Documentation réglementaire conforme aux exigences
+COBAC/ICAAP. Comparaison inter-modèles pour les anomalies BiVAT non
+détectées par LOF. Formulation de l'hypothèse économique par indicateur.
+
+\textbf{Priorité : Essentiel (pipeline BiVAT).}
+
+\subsection{Fig.~G  Carte de confusion LOF/BiVAT par pays et type
+d'anomalie}
+
+\subsubsection{Description}
+
+Tableau de chaleur de dimensions ($6 \times 4$) : six lignes pour les
+pays CEMAC et quatre colonnes pour les types d'anomalie (ponctuelle,
+contextuelle, collective, systémique). Chaque cellule encode le taux de
+concordance LOF--BiVAT pour ce type d'anomalie dans ce pays, sur la fenêtre
+de test. L'échelle va du blanc (concordance nulle ou type non détecté) au
+vert foncé (concordance maximale). Les cellules où les deux modèles
+s'accordent sur plus de 70\,\% des alertes sont encadrées.
+
+La classification des anomalies par type repose sur : ponctuelle ($s^{\mathrm{point}}_t$
+élevé, $s^{\mathrm{context}}_t$ et $s^{\mathrm{collect}}_{t:t+K}$ faibles),
+contextuelle ($s^{\mathrm{context}}_t$ élevé), collective
+($s^{\mathrm{collect}}_{t:t+K}$ élevé), systémique (anomalie détectée dans
+$m \geq 3$ pays simultanément).
+
+\placeholder{Fig. G  Carte de confusion LOF/BiVAT par pays et type}{
+Tableau 6×4. Lignes : Cameroun, Congo, Gabon, GQ, RCA, Tchad.
+Colonnes : Ponctuelle, Contextuelle, Collective, Systémique.
+Colormap : blanc (0\%) → vert foncé (100\% concordance).
+Encadrés : cellules > 70\% concordance. Valeurs numériques dans chaque
+cellule (\% concordance + nombre d'alertes entre parenthèses).
+Fichier : \texttt{figG\_confusion\_lof\_bivat.pdf}
+}
+
+\subsubsection{Pertinence analytique}
+
+Ce graphique synthétise la comparaison complète LOF--BiVAT en une seule
+visualisation structurée selon deux dimensions analytiques indépendantes :
+le pays (dimension géographique) et le type d'anomalie (dimension
+typologique). Il répond à la question centrale de l'étude comparative :
+sur quels types d'anomalies et dans quels pays les deux modèles s'accordent-ils,
+et où divergent-ils ?
+
+La structure attendue est révélatrice : forte concordance sur les anomalies
+ponctuelles (les deux modèles détectent les mêmes outliers bruts) et faible
+concordance sur les anomalies contextuelles et collectives (BiVAT en
+détecte davantage grâce à sa modélisation temporelle). Si cette structure
+apparaît clairement dans le graphique, elle valide empiriquement sur les
+données BEAC l'argument théorique central des documents méthodologiques :
+BiVAT n'est pas un LOF amélioré, c'est un outil qui détecte des types
+d'anomalies structurellement différents.
+
+\subsubsection{Positionnement dans le workflow}
+
+\textbf{Phase~4  Synthèse comparative finale.} Ce graphique est le
+dernier produit dans le workflow. Il est inclus dans la section de conclusion
+du rapport opérationnel comme bilan de la comparaison inter-modèles et
+guide de recommandation pour le déploiement.
+
+\subsubsection{Données requises}
+
+Classification de toutes les alertes LOF et BiVAT par type (ponctuelle,
+contextuelle, collective, systémique) sur la fenêtre de test. Calcul du
+taux de concordance par cellule (pays × type). Scores BiVAT multi-niveaux
+$s^{\mathrm{point}}_t$, $s^{\mathrm{context}}_t$,
+$s^{\mathrm{collect}}_{t:t+K}$ pour la classification.
+
+\subsubsection{Décision supportée}
+
+Bilan de la comparaison inter-modèles. Recommandation de déploiement :
+LOF comme filtre rapide sur les anomalies ponctuelles, BiVAT comme outil
+principal pour les anomalies contextuelles et collectives.
+Documentation de la valeur ajoutée empirique de BiVAT sur les données
+BEAC réelles. Guide pour l'allocation des ressources d'investigation.
+
+\textbf{Priorité : Important.}
+
+% ════════════════════════════════════════════════════════════════
+\section{Catalogue Récapitulatif}
+
+\begin{landscape}
+\begin{longtable}{p{1.5cm}p{3.8cm}p{2cm}p{1.5cm}p{3cm}p{3.5cm}p{2cm}}
+\caption{Catalogue complet des graphiques du système de visualisation.}
+\label{tab:catalogue}\\
+\toprule
+\textbf{Fig.} & \textbf{Titre} & \textbf{Phase} &
+\textbf{Modèle} & \textbf{Données requises} &
+\textbf{Décision supportée} & \textbf{Priorité} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Fig.} & \textbf{Titre} & \textbf{Phase} &
+\textbf{Modèle} & \textbf{Données requises} &
+\textbf{Décision supportée} & \textbf{Priorité} \\
+\midrule
+\endhead
+\bottomrule\endlastfoot
+
+Fig.~1 & Carte des données manquantes &
+Ph.~1 & Commun &
+Données brutes post-chargement &
+Stratégie imputation ; exclusions &
+Essentiel \\
+\midrule
+
+Fig.~2 & Heatmap corrélations résidus STL &
+Ph.~1 & Commun &
+Résidus RobustSTL + MAD, entraîn. &
+Justification RPCA ; $k$ indicatif &
+Essentiel \\
+\midrule
+
+Fig.~3 & Décomposition RobustSTL 4 panneaux &
+Ph.~1 & Commun &
+Brut + $T$, $S$, $R$ après RobustSTL &
+Validation décomposition ; résidus &
+Essentiel \\
+\midrule
+
+Fig.~A & Variance RPCA dans le temps &
+Ph.~1 & Commun &
+Résidus MAD + RPCA fenêtres 36m &
+Ruptures régime structurelles ; $k$ &
+Important \\
+\midrule
+
+Fig.~4 & Scree plot RPCA &
+Ph.~2 & LOF &
+Valeurs propres RPCA, entraîn. &
+Choix de $k$ &
+Essentiel LOF \\
+\midrule
+
+Fig.~5 & Biplot ACP (CP1 et CP2) &
+Ph.~2 & LOF &
+Projections CP1/CP2 + loadings &
+Exploration visuelle préliminaire &
+Complémentaire \\
+\midrule
+
+Fig.~6 & Projection UMAP &
+Ph.~2 & LOF &
+Résidus MAD + scores LOF* &
+Exploration non-linéaire (annexe) &
+Complémentaire \\
+\midrule
+
+Fig.~7 & Profils LOF(MinPts) &
+Ph.~2 & LOF &
+LOF$_k$(t) pour $k \in [10,30]$ &
+Validation plage MinPts ; robustesse &
+Essentiel LOF \\
+\midrule
+
+Fig.~8 & Distribution empirique LOF* &
+Ph.~2 & LOF &
+Scores LOF*, entraîn. &
+Seuils $\tau_{\mathrm{IQR}}$ et $\tau_{95}$ &
+Essentiel LOF \\
+\midrule
+
+Fig.~E & Intervalles CP BiVAT (calibration) &
+Ph.~2 & BiVAT &
+Scores BiVAT + CP, calib. set &
+Validation coverage CP ; $\hat{q}_{1-\alpha}$ &
+Essentiel BiVAT \\
+\midrule
+
+Fig.~9 & Boxplot LOF* par année &
+Ph.~3 & LOF &
+Scores LOF*, 2001--2026 &
+Vue temporelle agrégée ; validation &
+Important \\
+\midrule
+
+Fig.~10 & Série temporelle LOF*(t) &
+Ph.~3 & LOF &
+Scores LOF* + $\tau$ + événements &
+Rapport opérationnel principal LOF &
+Essentiel \\
+\midrule
+
+Fig.~11 & LOF + résidu + série brute &
+Ph.~3 & LOF &
+LOF*, $R_{i^*,t}$, $x_{i^*,t}$ &
+Interprétation anomalie par anomalie &
+Important \\
+\midrule
+
+Fig.~12 & Bar chart contributeurs &
+Ph.~3 & LOF &
+Résidus normalisés $R_{i,t}^*$ au mois $t$ &
+Attribution indicateurs ; audit COBAC &
+Essentiel \\
+\midrule
+
+Fig.~13 & Heatmap anomalies (ind. × mois) &
+Ph.~3 & LOF &
+$R_{i,t}^*$ pour tous mois anomaux &
+Interprétation économique globale &
+Essentiel \\
+\midrule
+
+Fig.~14 & Carte de chaleur inter-pays &
+Ph.~3 & LOF &
+LOF* 6 pays + seuils nationaux &
+Anomalies systémiques CEMAC &
+Essentiel \\
+\midrule
+
+Fig.~B & Concordance Actif--Passif &
+Ph.~3 & LOF &
+LOF* Actif + LOF* Passif par pays &
+Triage événement réel vs collecte &
+Essentiel \\
+\midrule
+
+Fig.~D & Comparaison LOF vs BiVAT &
+Ph.~4 & Commun &
+LOF* + BiVAT normalisés + seuils &
+Alertes niveau~1 vs niveau~2 &
+Essentiel \\
+\midrule
+
+Fig.~E bis & Score BiVAT + intervalles CP &
+Ph.~4 & BiVAT &
+Scores BiVAT + CP, test &
+Rapport opérationnel principal BiVAT &
+Essentiel \\
+\midrule
+
+Fig.~F & Attribution SHAP top-5 BiVAT &
+Ph.~4 & BiVAT &
+Valeurs DeepSHAP $\phi_d$ aux top-5 &
+Attribution réglementaire COBAC &
+Essentiel BiVAT \\
+\midrule
+
+Fig.~G & Carte confusion LOF/BiVAT &
+Ph.~4 & Commun &
+Alertes classifiées par type + pays &
+Bilan comparatif ; recommandation &
+Important \\
+\end{longtable}
+\end{landscape}
+
+% ════════════════════════════════════════════════════════════════
+\section{Conclusion et Guide d'Utilisation Opérationnelle}
+
+\subsection{Bilan du système visuel}
+
+Ce document a décrit un système de visualisation complet en 21 graphiques
+organisés en quatre phases séquentielles, couvrant l'intégralité du workflow
+de détection de points d'intérêt dans les données monétaires BEAC-CEMAC.
+Parmi les 14 graphiques du corpus initial, 12 sont retenus, 2 sont reclassés
+en complémentaires avec des réserves méthodologiques documentées (Fig.~5
+biplot ACP et Fig.~6 projection UMAP), et 1 est corrigé (Fig.~12 : radar
+chart remplacé par bar chart horizontal pour des raisons d'auditabilité).
+Sept graphiques supplémentaires ont été identifiés comme nécessaires à la
+complétude du système (Fig.~A, Fig.~B, Fig.~D, Fig.~E, Fig.~E bis,
+Fig.~F, Fig.~G).
+
+\subsection{Guide de séquencement opérationnel}
+
+Le tableau~\ref{tab:sequencement} présente le guide d'utilisation
+opérationnelle du système visuel, organisé par ordre d'exécution et par
+question analytique à laquelle chaque graphique répond.
+
+\begin{table}[ht]
+\centering
+\caption{Guide de séquencement opérationnel des graphiques.}
+\label{tab:sequencement}
+\small
+\begin{tabular}{p{0.5cm}p{1.8cm}p{2cm}p{4cm}p{5cm}}
+\toprule
+\textbf{\#} & \textbf{Figure} & \textbf{Quand} &
+\textbf{Question posée} & \textbf{Si anomalie détectée} \\
+\midrule
+1 & Fig.~1 & Phase~1, t=0 &
+Les données sont-elles exploitables ? &
+Appliquer la stratégie d'imputation adaptée \\
+\midrule
+2 & Fig.~3 & Phase~1, après STL &
+La décomposition est-elle correcte ? &
+Ajuster paramètres RobustSTL si résidus non stationnaires \\
+\midrule
+3 & Fig.~2 & Phase~1, après STL &
+Quelle est la structure de covariance des résidus ? &
+Informer le choix de $k$ pour la RPCA \\
+\midrule
+4 & Fig.~A & Phase~1, après STL &
+La structure de covariance change-t-elle dans le temps ? &
+Activer CP pondérée pour les périodes à faible variance expliquée \\
+\midrule
+5 & Fig.~4 & Phase~2, LOF &
+Combien de composantes RPCA retenir ? &
+Fixer $k$ au coude ou à 90\,\% de variance expliquée \\
+\midrule
+6 & Fig.~7 & Phase~2, LOF &
+La plage MinPts $[10,30]$ est-elle valide ? &
+Ajuster les bornes si aucune anomalie n'est robuste \\
+\midrule
+7 & Fig.~8 & Phase~2, LOF &
+Quels sont les seuils de détection $\tau$ ? &
+Fixer $\tau_{\mathrm{IQR}}$ et $\tau_{95}$ \\
+\midrule
+8 & Fig.~E & Phase~2, BiVAT &
+Le coverage CP est-il conforme au niveau nominal ? &
+Ajuster SSBC si écart $>5\,\%$ \\
+\midrule
+9 & Fig.~10 & Phase~3, LOF &
+Quand les anomalies LOF se produisent-elles ? &
+Annoter avec événements CEMAC ; investiguer pics non annotés \\
+\midrule
+10 & Fig.~E bis & Phase~3, BiVAT &
+Quand les anomalies BiVAT se produisent-elles ? &
+Classer par certitude : score + intervalle inférieur vs seuil \\
+\midrule
+11 & Fig.~13 & Phase~3, LOF &
+Quels indicateurs portent chaque anomalie LOF ? &
+Produire Fig.~12 (bar chart) pour les anomalies robustes \\
+\midrule
+12 & Fig.~F & Phase~3, BiVAT &
+Quels indicateurs portent chaque anomalie BiVAT ? &
+Documentation réglementaire COBAC \\
+\midrule
+13 & Fig.~14 & Phase~3, commun &
+Les anomalies sont-elles systémiques CEMAC ? &
+Si $m \geq 3$ pays : alerte systémique niveau~1 \\
+\midrule
+14 & Fig.~B & Phase~3, LOF &
+L'anomalie est-elle concordante Actif--Passif ? &
+Concordante : événement économique réel. Discordante : erreur collecte \\
+\midrule
+15 & Fig.~D & Phase~4, commun &
+LOF et BiVAT s'accordent-ils sur cette anomalie ? &
+Accord : alerte niveau~1. LOF seul : anomalie ponctuelle.
+BiVAT seul : anomalie contextuelle/collective \\
+\midrule
+16 & Fig.~G & Phase~4, commun &
+Quel modèle est le plus pertinent pour quel type d'anomalie ? &
+Recommandation de déploiement : LOF filtrage rapide,
+BiVAT surveillance contextuelle \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Recommandation de déploiement}
+
+Sur la base du système visuel documenté, la recommandation opérationnelle
+pour la BEAC est la suivante.
+
+\textit{Usage mensuel en surveillance continue.} Les graphiques Fig.~10
+(série temporelle LOF), Fig.~E bis (score BiVAT + intervalles CP) et
+Fig.~14 (heatmap inter-pays) sont mis à jour mensuellement à chaque
+réception des nouvelles données de reporting bancaire. Ils constituent
+le tableau de bord de surveillance de premier niveau.
+
+\textit{Investigation de second niveau.} Pour chaque nouvelle alerte
+identifiée (score LOF* ou BiVAT dépassant leurs seuils respectifs), les
+graphiques Fig.~11 (superposition LOF + résidu + brut), Fig.~12 (bar chart
+contributeurs LOF), Fig.~F (attribution SHAP BiVAT) et Fig.~B (concordance
+Actif--Passif) sont produits pour cette alerte spécifique. Ils constituent
+le dossier d'investigation transmis à l'équipe de surveillance.
+
+\textit{Rapport annuel de bilan.} Les graphiques Fig.~9 (boxplot par année),
+Fig.~13 (heatmap globale des anomalies) et Fig.~G (carte de confusion
+LOF/BiVAT) sont produits annuellement comme bilan de la surveillance et
+comme outil d'amélioration continue des deux modèles.
+
+\textit{Graphiques internes de validation.} Les graphiques Fig.~4 (scree
+plot), Fig.~5 (biplot), Fig.~6 (UMAP), Fig.~7 (profils MinPts) et Fig.~8
+(distribution LOF*) sont des outils de calibration interne, produits lors
+de la mise en place initiale et lors de chaque recalibration annuelle des
+modèles. Ils ne sont pas inclus dans les rapports opérationnels destinés
+aux superviseurs BEAC.
+
+% ════════════════════════════════════════════════════════════════
+\section*{Bibliographie}
+\addcontentsline{toc}{section}{Bibliographie}
+
+\begin{enumerate}
+
+\item Breunig, M.M., Kriegel, H.-P., Ng, R.T., \& Sander, J. (2000).
+LOF: Identifying Density-Based Local Outliers. \textit{ACM SIGMOD 2000},
+pp.~93--104. DOI:~10.1145/342009.335388.
+
+\item Wen, Q. et al. (2019). RobustSTL: A Robust Seasonal-Trend
+Decomposition Algorithm for Long Time Series. \textit{AAAI-19}.
+arXiv:1812.01767.
+
+\item Candès, E.J., Li, X., Ma, Y., \& Wright, J. (2011). Robust Principal
+Component Analysis? \textit{Journal of the ACM}, 58(3), Article~11.
+DOI:~10.1145/1970392.1970395.
+
+\item Zimek, A., Schubert, E., \& Kriegel, H.-P. (2012). A survey on
+unsupervised outlier detection in high-dimensional numerical data.
+\textit{Statistical Analysis and Data Mining}, 5(5), 363--387.
+
+\item Chandola, V., Banerjee, A., \& Kumar, V. (2009). Anomaly Detection:
+A Survey. \textit{ACM Computing Surveys}, 41(3), Article~15.
+
+\item Xu, J., Wu, H., Wang, J., \& Long, M. (2022). Anomaly Transformer:
+Time Series Anomaly Detection with Association Discrepancy.
+\textit{ICLR 2022 (Spotlight)}.
+
+\item Lundberg, S.M., \& Lee, S.I. (2017). A Unified Approach to
+Interpreting Model Predictions. \textit{NeurIPS}, 30.
+
+\item Kim, T.S. et al. (2022). Reversible Instance Normalization for
+Accurate Time-Series Forecasting against Distribution Shift.
+\textit{ICLR 2022}.
+\url{https://openreview.net/forum?id=cGDAkQo1C0p}
+
+\item Vovk, V., Gammerman, A., \& Shafer, G. (2005).
+\textit{Algorithmic Learning in a Random World}. Springer.
+
+\item arXiv:2509.15349 (2025). Small Sample Beta Correction for Conformal
+Prediction.
+
+\item Xu, C., \& Xie, Y. (2021). Conformal Prediction Intervals for Dynamic
+Time-Series. arXiv:2010.09107.
+
+\item Tukey, J.W. (1977). \textit{Exploratory Data Analysis}.
+Addison-Wesley.
+
+\item BIS / FSI (2024). How regulators can address AI explainability.
+\url{https://www.bis.org/fsi/fsipapers24.pdf}
+
+\item ECB (2025). Guide to Internal Models (ML chapter).
+\url{https://www.bankingsupervision.europa.eu}
+
+\item SHARC (2025). SHAP-Based Interpretability in ML Risk Models for
+ICAAP and CCAR. arXiv:2607.05484.
+
+\item arXiv:2403.04429 (2024). Exploring the Influence of Dimensionality
+Reduction on Anomaly Detection in MTS.
+
+\item arXiv:2508.21128 (2026). STAD: Seasonal-Trend Anomaly Detection.
+
+\item Goldstein, M., \& Uchida, S. (2016). A Comparative Evaluation of
+Unsupervised Anomaly Detection Algorithms for Multivariate Data.
+\textit{PLoS ONE}, 11(4): e0152173.
+
+\item Moukoko Ekambi, G.M. (2025). Méthodologie Modèle~1 : Détection
+d'Anomalies par LOF sur les Données Monétaires BEAC. Rapport de stage,
+BEAC / ENSPD / Université de Douala, LIDIA Laboratory.
+
+\item Moukoko Ekambi, G.M. (2025). Détection de Variations Atypiques dans
+les Séries Temporelles Financières par Architectures Hybrides VAE-Transformer :
+État de l'art outillé et justification architecturale de BiVAT. Rapport de
+stage, BEAC / ENSPD / Université de Douala, LIDIA Laboratory.
+
+\item Moukoko Ekambi, G.M. (2025). Pipeline de prétraitement des données
+monétaires BEAC-CEMAC : étapes communes et étapes spécifiques aux Modèles
+LOF et BiVAT. Rapport de stage, BEAC / ENSPD / Université de Douala,
+LIDIA Laboratory.
+
+\end{enumerate}
+
+\vspace{2cm}
+\hrule
+\vspace{0.5cm}
+\noindent{\small\textit{Document rédigé dans le cadre du stage de recherche
+à la Banque des États de l'Afrique Centrale (BEAC), M2 Data Science \& IA,
+ENSPD / Université de Douala  LIDIA Laboratory. Août 2026.}}
+
+\end{document}

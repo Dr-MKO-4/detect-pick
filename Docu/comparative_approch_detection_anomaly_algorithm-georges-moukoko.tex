@@ -1,0 +1,735 @@
+\documentclass[12pt, a4paper]{article}
+
+% ─── Packages ─────────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath, amssymb}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{graphicx}
+\usepackage{cite}
+\usepackage{setspace}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{abstract}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+\onehalfspacing
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    citecolor=blue!60!black,
+    urlcolor=blue!60!black
+}
+
+% ─── En-tête ─────────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\small Détection de variations atypiques par IA  Cameroun / BEAC}
+\lhead{\small État de l'art}
+\rfoot{\thepage}
+
+% ─── Titre ───────────────────────────────────────────────────────────────────
+\title{
+    \textbf{Détection de Variations Atypiques dans les Séries Temporelles\\
+    Financières par l'Intelligence Artificielle :}\\[0.3em]
+    \large État de l'Art
+}
+
+\author{
+    \textbf{MOUKOKO EKAMBI GEORGES MIGUEL}\\[0.3em]
+    \textit{Stagiaire, Banque des États de l'Afrique Centrale}\\
+    \textit{M2 Data Science \& IA  ENSPD / Université de Douala}\\
+    \textit{LIDIA Laboratory}\\[0.5em]
+    \textit{Données sources : Banque des États de l'Afrique Centrale (BEAC)}\\
+}
+
+\date{\today}
+
+% ─── Document ────────────────────────────────────────────────────────────────
+\begin{document}
+
+\maketitle
+
+% ─── Résumé ──────────────────────────────────────────────────────────────────
+\begin{abstract}
+La détection de variations atypiques  aussi appelée \textit{anomaly detection}
+ constitue un enjeu central de la surveillance des systèmes financiers.
+Ce document dresse un état de l'art des principales méthodes d'intelligence
+artificielle mobilisées à cette fin, depuis les approches fondatrices basées
+sur la densité locale jusqu'aux architectures profondes les plus récentes
+(autoencodeurs, réseaux génératifs adversariaux, transformers).
+Chaque méthode est présentée avec ses fondements théoriques, ses forces et ses
+limites, en s'appuyant sur les travaux scientifiques de référence.
+Nous présentons également \textbf{MKO-KAN}, une architecture originale à base
+de réseaux de Kolmogorov-Arnold développée dans le cadre de ce stage, qui apporte
+une capacité d'interprétabilité symbolique adaptée aux exigences d'audit COBAC/BEAC.
+En seconde partie, nous présentons le jeu de données Monétaires
+produit à partir des statistiques de la BEAC (Banque des États de
+l'Afrique Centrale) selon la nomenclature IFS du Fonds Monétaire International,
+et nous analysons la cohérence entre les caractéristiques de ce dataset et
+chacune des méthodes IA exposées, afin d'orienter les choix méthodologiques
+pour la détection d'anomalies dans ce contexte.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Introduction}
+% ═════════════════════════════════════════════════════════════════════════════
+
+La détection de variations atypiques est définie comme le processus
+d'identification de patrons dans des données qui ne se conforment pas au
+comportement attendu. Dans le domaine financier et monétaire, ces variations
+peuvent signaler des erreurs de collecte, des chocs macroéconomiques, des
+fraudes, ou des transitions structurelles importantes.
+L'essor des méthodes d'apprentissage automatique a profondément renouvelé
+l'approche de ce problème, en permettant de traiter des données de haute
+dimension, des séries temporelles longues et des structures multivariées
+complexes.
+
+Comme le soulignent Pang \textit{et al.} \cite{pang2021deep}, la détection
+d'anomalies par apprentissage profond constitue désormais une direction
+critique, couvrant trois grandes catégories de méthodes et onze sous-catégories
+de techniques, chacune reposant sur des hypothèses et des fonctions objectif
+spécifiques.
+
+Cette étude est structuré comme suit : la section~\ref{sec:methodes_classiques}
+présente les méthodes classiques de référence ; la section~\ref{sec:deep}
+couvre les approches d'apprentissage profond, dont MKO-KAN ; la
+section~\ref{sec:dataset} décrit le jeu de données BEAC-Cameroun ; enfin,
+la section~\ref{sec:coherence} évalue la cohérence méthodologique entre chaque
+technique et les caractéristiques du dataset.
+
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Méthodes Classiques de Référence}
+\label{sec:methodes_classiques}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\subsection{Local Outlier Factor (LOF)}
+
+Le \textit{Local Outlier Factor} (LOF) est l'une des méthodes fondatrices
+de la détection d'anomalies fondées sur la densité locale, introduite par
+Breunig \textit{et al.} \cite{breunig2000lof}. La contribution centrale de
+ce travail réside dans l'attribution à chaque observation d'un \textit{degré}
+d'anormalité  le facteur LOF  plutôt qu'une simple classification
+binaire. Ce degré est calculé en comparant la densité locale d'un point à
+celle de ses $k$ plus proches voisins.
+
+Formellement, la densité locale de chaque observation $p$ est estimée par la
+distance de joignabilité (\textit{reachability distance}) à ses $k$ voisins.
+Un point dont la densité locale est significativement inférieure à celle de
+son voisinage se voit attribuer un LOF élevé, le qualifiant d'anomalie.
+
+Cette approche présente l'avantage d'être non-paramétrique et de s'adapter
+aux distributions de données complexes et multi-modales. Ses limites tiennent
+à son coût computationnel en $\mathcal{O}(n^2)$ et à sa sensibilité au
+paramètre $k$.
+
+
+
+
+\subsection{Isolation Forest (iForest)}
+
+L'Isolation Forest, proposé par Liu \textit{et al.} \cite{liu2012isolation},
+constitue une rupture paradigmatique par rapport aux méthodes précédentes.
+Plutôt que de modéliser le comportement normal pour en déduire les anomalies,
+iForest isole directement les anomalies en exploitant deux propriétés
+intrinsèques : elles sont en minorité dans le dataset et leurs attributs
+diffèrent significativement des observations normales.
+
+L'algorithme construit un ensemble (\textit{forest}) d'arbres d'isolation
+(\textit{isolation trees}), chaque arbre partitionnant récursivement l'espace
+des données par des coupures aléatoires. La longueur moyenne du chemin
+parcouru dans l'arbre pour isoler un point est inversement proportionnelle
+à son score d'anomalie : les points anormaux sont isolés plus rapidement car
+ils résident dans des régions de faible densité.
+
+Liu \textit{et al.} \cite{liu2012isolation} démontrent qu'iForest surpasse les
+méthodes One-Class SVM, LOF et ORCA en termes d'AUC et de temps de traitement,
+avec une complexité linéaire $\mathcal{O}(n)$ particulièrement adaptée aux
+grandes volumétries. Il s'avère également robuste aux phénomènes de masquage
+et de dilution, et performant en haute dimension.
+
+
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Méthodes d'Apprentissage Profond}
+\label{sec:deep}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\subsection{Autoencodeurs (Autoencoder, AE)}
+
+Les autoencodeurs constituent la porte d'entrée du \textit{deep learning}
+dans la détection d'anomalies. Introduits pour la réduction de dimensionnalité
+par Hinton \& Salakhutdinov \cite{hinton2006reducing}, ils se composent
+d'un encodeur qui projette les données dans un espace latent de dimension
+réduite et d'un décodeur qui reconstruit l'entrée originale.
+
+Le principe central pour la détection d'anomalies repose sur l'hypothèse
+de reconstruction différentielle : un modèle entraîné exclusivement sur
+des données normales développe une capacité de reconstruction élevée pour
+les exemples normaux, mais produit une erreur de reconstruction
+(\textit{reconstruction error}) élevée pour les anomalies, dont les
+patterns ne correspondent pas à la distribution apprise.
+
+Le seuil de détection est généralement fixé sur la distribution empirique
+des erreurs de reconstruction observées sur l'ensemble d'entraînement.
+Parmi les variantes notables, les Robust Deep Autoencoders (RDA) décomposent
+l'entrée $X$ en une composante normale $L_D$ et une composante de bruit $S$
+\cite{zhou2017anomaly}, renforçant la robustesse aux contaminations.
+
+
+
+\subsection{Autoencodeurs Variationnels (Variational Autoencoder, VAE)}
+
+Le VAE, formalisé par Kingma \& Welling \cite{kingma2013auto}, étend
+l'autoencodeur classique en introduisant une représentation probabiliste
+de l'espace latent. Plutôt que d'encoder chaque entrée en un point fixe,
+le VAE encode une distribution de probabilité (typiquement gaussienne)
+dans l'espace latent.
+
+Pour la détection d'anomalies, au lieu de mesurer une simple erreur de
+reconstruction, on calcule une \textit{probabilité de reconstruction}
+estimée par échantillonnage multiple depuis l'espace latent \cite{an2015vae}.
+Cette approche probabiliste permet de mieux quantifier l'incertitude et
+d'attribuer des scores d'anomalie plus nuancés.
+
+Le VAE est particulièrement adapté à la détection d'anomalies non supervisée
+dans les séries temporelles multivariées, bien que sa capacité à modéliser
+les dépendances à long terme reste une limitation reconnue \cite{shap2025}.
+Des architectures hybrides intégrant des mécanismes d'attention
+multi-têtes ont été proposées pour pallier cette limite.
+
+
+
+\subsection{Réseaux Génératifs Adversariaux (GAN)  AnoGAN et f-AnoGAN}
+
+Les GANs ont ouvert une nouvelle voie pour la détection d'anomalies non
+supervisée. Schlegl \textit{et al.} \cite{schlegl2017unsupervised} ont
+introduit \textbf{AnoGAN}, le premier framework GAN dédié à la détection
+d'anomalies, en exploitant la capacité des GANs à modéliser la distribution
+des données normales.
+
+L'architecture repose sur l'entraînement d'un GAN (architecture DCGAN)
+uniquement sur des données normales, apprenant ainsi la distribution de
+la variabilité normale dans l'espace latent. Pour détecter une anomalie,
+AnoGAN cherche le point $z$ dans l'espace latent tel que le vecteur généré
+$G(z)$ soit le plus proche de l'observation $x$ à tester. Un score d'anomalie
+combinant l'erreur de reconstruction et un score de discrimination est alors
+calculé. L'anomalie correspond à une observation qui ne peut pas être
+fidèlement mappée dans l'espace latent du GAN.
+
+La version améliorée \textbf{f-AnoGAN} \cite{schlegl2019fanogan} introduit
+un encodeur dédié pour accélérer drastiquement l'inférence, en substituant
+à la recherche itérative dans l'espace latent un mapping direct image-vers-
+latent. Cette amélioration rend l'approche praticable dans des contextes
+opérationnels.
+
+\subsection{Transformers  Anomaly Transformer}
+
+Les Transformers, initialement conçus pour le traitement du langage naturel,
+ont récemment démontré un potentiel remarquable pour la détection d'anomalies
+dans les séries temporelles, en exploitant les mécanismes d'auto-attention
+pour capturer les dépendances à longue portée \cite{mamba2025}.
+
+L'\textbf{Anomaly Transformer}, proposé par Xu \textit{et al.}
+\cite{xu2022anomaly} (ICLR 2022, Spotlight), introduit le concept
+d'\textit{Association Discrepancy} comme critère discriminant. L'observation
+centrale est la suivante : en raison de la rareté des anomalies, un point
+anormal ne peut construire que des associations triviales avec le reste de la
+série temporelle, concentrées sur ses points temporels adjacents. Un point
+normal, en revanche, construit des associations distribuées sur l'ensemble
+de la série.
+
+L'Anomaly Transformer formalise cette intuition en apprenant deux
+distributions d'associations  une distribution gaussienne prioritaire
+(\textit{prior association}) et une association à partir des données
+(\textit{series association})  et en maximisant leur discordance via
+une stratégie \textit{minimax}. Cette approche surpasse les méthodes
+antérieures sur plusieurs benchmarks de séries temporelles.
+
+Des extensions récentes intègrent des mécanismes d'attention parcimonieuse
+(\textit{sparse attention}) pour améliorer l'efficacité sur les longues
+séquences, ainsi que des architectures hybrides Mamba-Transformer
+\cite{mamba2025} qui combinent les avantages des modèles d'état sélectifs
+et de l'auto-attention.
+
+
+\subsection{MKO-KAN : Réseaux de Kolmogorov-Arnold Hybrides pour la Détection
+d'Anomalies Financières}
+
+Les réseaux de Kolmogorov-Arnold (KAN), formalisés par Liu \textit{et al.}
+\cite{liu2024kan}, constituent une rupture architecturale par rapport aux
+perceptrons multicouches classiques (MLP). Là où un MLP applique des fonctions
+d'activation fixes aux nœuds, un KAN paramétrise des \textit{fonctions d'arête
+apprenables} $\varphi_{ij}$ entre chaque paire de nœuds connectés, en
+s'appuyant sur le théorème de représentation de Kolmogorov-Arnold. Cette
+propriété confère aux KAN une interprétabilité structurelle native : après
+élagage, le réseau se réduit à un graphe de formules analytiques.
+
+Le modèle \textbf{MKO-KAN} (\textit{Mobile-Money Kolmogorov-Arnold Network}),
+développé dans le cadre de ce stage à la BEAC \cite{moukoko2025mkan}, adapte
+cette architecture à la détection de fraude et d'anomalies dans les séries
+financières de la zone CEMAC. Il repose sur trois innovations clés :
+
+\begin{enumerate}
+    \item \textbf{Cellule T-KAN (TKANCell)} : extension récurrente de type LSTM
+    dans laquelle chaque porte (oubli, entrée, candidate, sortie) est une couche
+    KAN hybride \texttt{HybridKANLayer}. Cette structure capture les dépendances
+    temporelles séquentielles propres aux flux transactionnels ou aux agrégats
+    monétaires mensuels.
+
+    \item \textbf{Arêtes hybrides Gaussienne + Fourier (HybridEdgeFunction)} :
+    chaque fonction d'arête combine une composante gaussienne (FastKAN
+    \cite{li2024fastkan}) pour la localisation et une composante de Fourier
+    (KAN-AD \cite{zhou2024kanad}) pour les patterns périodiques :
+    \[
+      \varphi_{ij}(x) =
+        \underbrace{\sum_{m} w_m \exp\!\left(-\frac{(x-\mu_m)^2}{2h^2}\right)}_{\text{Gaussienne (FastKAN)}}
+        +
+        \underbrace{\sum_{k} \left[a_k \cos(kx) + b_k \sin(kx)\right]}_{\text{Fourier (KAN-AD)}}
+    \]
+
+    \item \textbf{Nœuds multiplicatifs MultKAN} : en complément des nœuds
+    additifs ($\sum_i \varphi_{ij}(x_i)$), des nœuds multiplicatifs
+    ($\prod_i \varphi_{ij}(x_i)$) encodent les interactions contextuelles
+    ciblées entre variables  par exemple, la co-occurrence d'un retrait
+    important et d'un horaire nocturne dans les séries transactionnelles
+    \cite{yanglu2024kan}.
+\end{enumerate}
+
+\textbf{Interprétabilité et conformité réglementaire.}
+La sparsification par norme $L_1$ élague le réseau jusqu'à un sous-graphe
+minimal, sur lequel une régression symbolique extrait des formules analytiques
+explicites. Ce mécanisme produit des règles de décision auditables,
+directement exploitables dans le cadre des obligations COBAC/BEAC de
+traçabilité algorithmique.
+
+La fonction de perte totale combine trois termes :
+\[
+  \mathcal{L} = \mathcal{L}_{\text{BCE}} + \lambda \|\Phi\|_1
+              + \mu_1 H_1(\Phi) + \mu_2 H_2(\Phi)
+\]
+où $\mathcal{L}_{\text{BCE}}$ est la perte de classification pondérée par la
+prévalence de fraude, $\|\Phi\|_1$ la régularisation $L_1$ sur les arêtes,
+et $H_1, H_2$ des termes d'entropie favorisant la parcimonie structurelle.
+
+La recherche des hyperparamètres optimaux (taille de couche cachée, bases
+Gaussienne/Fourier, coefficients de régularisation, taux d'apprentissage)
+est assurée par un algorithme génétique avec mutation adaptative et modèle
+d'estimation de distribution (EDA), inspiré des méta-heuristiques de Hao
+\& Solnon \cite{haosol2024meta}.
+
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Présentation du Dataset : Données Monétaires (BEAC)}
+\label{sec:dataset}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\subsection{Origine et nature des données}
+
+Les jeux de données analysées dans ce travail sont issus de la
+\textbf{Banque des États de l'Afrique Centrale (BEAC)}, constitué à partir
+de la nomenclature IFS (\textit{International Financial Statistics}) du
+Fonds Monétaire International. Il porte sur la situation de l'\textbf{actif/passif
+du bilan des Autres Sociétés de Dépôts (2SR)} de la sous région, couvrant
+l'ensemble des institutions de dépôts non bancaires centrales.
+
+Le fichier source  \texttt{clean\_<pays>\_beac\_mapping\_2SR\_<actif/passif>.xlsx}
+ résulte d'un travail de nettoyage et de restructuration des données
+brutes de la BEAC réalisé par l'équipe de recherche.
+
+\subsection{Caractéristiques structurelles}
+
+Le dataset présente les caractéristiques suivantes :
+
+\begin{longtable}{>{\bfseries}p{4.5cm} p{9cm}}
+\toprule
+\textbf{Dimension} & \textbf{Description} \\
+\midrule
+\endhead
+Période couverte & Décembre 2001 à Mars 2026 (données mensuelles)\\
+Nombre de périodes & $\approx 195$ observations temporelles\\
+Nombre de séries & $\approx 55$ indicateurs financiers\\
+Format & Données en panel large (\textit{wide format})\\
+Unité & Milliards de FCFA (Franc CFA de la CEMAC)\\
+Fréquence & Mensuelle (notation : \texttt{AAAMyy})\\
+\bottomrule
+\end{longtable}
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Cohérence entre le Dataset et les Méthodes IA}
+\label{sec:coherence}
+% ═════════════════════════════════════════════════════════════════════════════
+
+\subsection{Cohérence avec le Local Outlier Factor (LOF)}
+
+\textbf{Applicabilité : Modérée.}
+
+Le LOF est adapté à la détection d'anomalies ponctuelles dans un espace
+multidimensionnel statique. Son application directe aux séries temporelles
+nécessite une transformation préalable (ex. : fenêtres glissantes ou
+extraction de caractéristiques statiques par série).
+
+Dans le contexte BEAC, le LOF peut être appliqué sur les niveaux mensuels
+de chaque indicateur, en traitant chaque observation $(t, \mathbf{x}_t)$
+comme un point dans un espace de dimension égale au nombre de séries.
+La nature multivariée du dataset (55 séries) rend cependant le LOF
+sensible à la malédiction de la dimensionnalité (\textit{curse of
+dimensionality}), nécessitant une réduction préalable de dimension (PCA,
+UMAP). Par ailleurs, les valeurs manquantes doivent être imputées et
+les tendances longues supprimées pour éviter des faux positifs.
+
+\textbf{Usage recommandé} : exploration préliminaire, détection d'anomalies
+sur séries individuelles après stationnarisation.
+
+\subsection{Cohérence avec l'Isolation Forest}
+
+\textbf{Applicabilité : Élevée.}
+
+L'Isolation Forest constitue l'une des méthodes les plus directement
+applicables au dataset BEAC pour plusieurs raisons. Sa complexité
+linéaire $\mathcal{O}(n)$ le rend efficace sur les $\approx 195 \times 55$
+cellules disponibles. Sa robustesse à la haute dimensionnalité (55 séries)
+et aux attributs non pertinents est particulièrement précieuse dans ce
+contexte où de nombreuses séries sont des composantes d'agrégats.
+
+La nature non supervisée d'iForest s'avère également adaptée à l'absence
+de labels d'anomalies historiquement certifiés. Les valeurs manquantes
+devront être traitées préalablement (imputation ou masquage).
+
+La capacité d'iForest à fonctionner sans hypothèse de distribution
+lui permet de gérer les distributions asymétriques et les queues lourdes
+fréquentes dans les données financières. Il sera appliqué de manière
+optimale en mode multivarié sur les résidus après décomposition des
+tendances.
+
+\subsection{Cohérence avec l'Autoencoder (AE)}
+
+\textbf{Applicabilité : Élevée, sous conditions.}
+
+L'autoencoder est particulièrement adapté à la structure multivariée
+et temporelle du dataset BEAC. Un autoencoder récurrent (LSTM-AE ou
+GRU-AE) peut modéliser simultanément les dépendances temporelles et
+les co-variations entre les 55 séries. Le principe de reconstruction
+différentielle est cohérent avec la logique de surveillance financière :
+une série qui s'écarte de son comportement habituel génère une erreur
+de reconstruction élevée.
+
+La quantité de données ($\approx 195$ points mensuels) constitue
+cependant une contrainte : un AE profond nécessitera une architecture
+modérée (2--3 couches) et des techniques de régularisation (dropout,
+early stopping) pour éviter le surapprentissage. La normalisation des
+séries (par unité de variance ou min-max) est impérative compte tenu
+de l'hétérogénéité des échelles.
+
+\textbf{Nous recommandons notamment ces variante} : Convolutional-Recurrent AE (CR-AE) pour
+exploiter à la fois la structure temporelle locale et les dépendances
+longues.
+
+\subsection{Cohérence avec le VAE}
+
+\textbf{Applicabilité : Élevée, avec avantage probabiliste.}
+
+Le VAE présente un avantage décisif par rapport à l'AE classique dans
+le contexte BEAC : sa nature probabiliste permet de quantifier
+l'incertitude associée à chaque score d'anomalie, ce qui est
+particulièrement précieux pour la surveillance macroprudentielle.
+
+La capacité du VAE à modéliser une distribution sur l'espace latent
+est adaptée à la nature stochastique des agrégats monétaires, soumis
+à des chocs exogènes (politiques, crises). Le VAE peut de plus être
+conditionné (\textit{conditional VAE}) sur des variables temporelles
+(mois, trimestre, phase du cycle économique) pour mieux capturer la
+saisonnalité.
+
+La limitation en matière de dépendances longues peut être partiellement
+compensée par l'intégration de mécanismes d'attention, comme proposé
+dans SHAPAttenVAE \cite{shap2025}.
+
+\subsection{Cohérence avec les GAN (AnoGAN / f-AnoGAN)}
+
+\textbf{Applicabilité : Modérée, contexte exigeant.}
+
+Les approches GAN présentent un potentiel élevé pour modéliser la
+distribution des régimes normaux du système bancaire camerounais.
+Cependant, leur applicabilité directe est contrainte par la taille
+modeste du dataset ($\approx 195$ observations) : l'entraînement d'un
+GAN stable nécessite généralement plusieurs milliers d'exemples.
+
+Une stratégie viable consiste à utiliser le \textbf{TAnoGAN}
+\cite{tanogan2020}, qui adapte le framework AnoGAN aux séries temporelles
+avec un faible nombre d'observations, ou à recourir à des techniques
+d'augmentation de données (bootstrapping saisonnier, simulation DSGE
+calibrée). f-AnoGAN reste la variante la plus opérationnelle grâce à
+son encodeur dédié qui élimine la phase de recherche dans l'espace latent.
+
+\subsection{Cohérence avec l'Anomaly Transformer}
+
+\textbf{Applicabilité : Très élevée pour les séries longues.}
+
+L'Anomaly Transformer est particulièrement adapté à la nature temporelle
+et multivariée du dataset BEAC. Son mécanisme d'\textit{Association
+Discrepancy} est conceptuellement cohérent avec la logique de surveillance
+monétaire : une variation mensuelle anormale (ex. : effondrement soudain
+des crédits à l'administration centrale ou une rupture dans les dépôts
+transférables) est précisément caractérisée par l'impossibilité de
+construire des associations non-triviales avec le reste de la série.
+
+La longueur des séries (195 périodes) est suffisante pour pré-entraîner
+un Anomaly Transformer de taille modeste. Les mécanismes d'attention
+multi-têtes permettront de capturer simultanément les interactions
+entre les 55 séries et les dépendances intra-série sur des horizons
+variés (mensuel, trimestriel, annuel).
+
+\textbf{Usage recommandé} : détection en temps quasi-réel des ruptures
+dans les agrégats de premier niveau (Numéraire, Dépôts, Crédits,
+Total des actifs), avec fenêtre glissante de 24 mois.
+
+\subsection{Cohérence avec MKO-KAN}
+
+\textbf{Applicabilité : Très élevée, avec adaptation au mode non supervisé.}
+
+Le MKO-KAN présente une cohérence structurelle forte avec le dataset BEAC pour
+plusieurs raisons complémentaires.
+
+\textbf{Traitement séquentiel natif.}
+La cellule TKANCell traite les séries temporelles de manière récurrente, ce
+qui est naturellement aligné avec la fréquence mensuelle du dataset (195
+périodes). Une fenêtre glissante de 12 à 24 mois peut être utilisée comme
+entrée séquentielle, permettant de modéliser les dynamiques annuelles et les
+effets de saisonnalité budgétaire.
+
+\textbf{Interprétabilité réglementaire  atout décisif.}
+Dans le contexte de la BEAC, la capacité du MKO-KAN à produire des formules
+analytiques via la régression symbolique constitue un avantage différenciant
+majeur par rapport aux approches boîte noire (AnoGAN, Anomaly Transformer).
+Pour un auditeur ou un superviseur prudentiel, une règle de décision de la
+forme $f(\text{Dépôts\_BQ} ,\, \text{Crédits\_ENF}) > \tau$ est directement
+interprétable et opposable réglementairement.
+
+\textbf{Modélisation des interactions entre indicateurs.}
+Les nœuds MultKAN permettent d'encoder des interactions ciblées entre postes
+du bilan  par exemple, la co-variation simultanée des crédits aux
+sociétés non financières et des dépôts transférables non résidents,
+caractéristique de certains chocs de financement externe.
+
+\textbf{Détection de dérive structurelle.}
+Le module de détection de dérive intégré au MKO-KAN (divergence de
+Jensen-Shannon sur les distributions empiriques) peut signaler des ruptures
+structurelles dans les agrégats, comme celles observées autour de 2020--2021
+(choc COVID-19) et en 2024 (forte croissance des actifs non financiers).
+
+\textbf{Condition d'adaptation.}
+Le MKO-KAN est conçu pour la classification supervisée fraude/non-fraude.
+Son application à la détection \textit{non supervisée} d'anomalies dans les
+séries BEAC nécessite une adaptation : l'erreur de reconstruction de la
+cellule T-KAN ou la déviation des poids d'arête par rapport à un modèle
+entraîné sur la période de référence (2001--2019) peuvent servir de score
+d'anomalie non supervisé.
+
+\textbf{Usage recommandé} : détection d'anomalies sur les postes à haute
+vélocité (crédits, dépôts transférables), avec production mensuelle de
+rapports d'audit symboliques conformes aux exigences COBAC.
+
+\subsection{Tableau récapitulatif}
+
+\begin{longtable}{p{3.5cm} p{2cm} p{4cm} p{4cm}}
+\toprule
+\textbf{Méthode} & \textbf{Apt.} & \textbf{Atouts} & \textbf{Conditions} \\
+\midrule
+\endhead
+LOF & Modérée & Non-paramétrique, interprétable & Réduction dim. préalable\\
+Isolation Forest & Élevée & Scalable, robuste, non supervisé & Stationnarisation des séries\\
+Autoencoder & Élevée & Modélisation temporelle & Peu de données (régularisation)\\
+VAE & Élevée & Incertitude quantifiée & Intégrer attention (\textit{long-range})\\
+AnoGAN / f-AnoGAN & Modérée & Distribution apprise & Taille dataset contraignante\\
+Anomaly Transformer & Très élevée & Dépend. long terme, multiv. & Normalisation, pré-entraînement\\
+MKO-KAN & Très élevée & Interprétable, temporel, interactions & Adaptation non supervisée requise\\
+\bottomrule
+\end{longtable}
+
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Discussion et Recommandations}
+\label{sec:discussion}
+% ═════════════════════════════════════════════════════════════════════════════
+
+L'analyse croisée entre les caractéristiques du dataset BEAC-Cameroun et
+les méthodes IA disponibles suggère une stratégie en deux niveaux :
+
+\begin{enumerate}
+    \item \textbf{Niveau exploratoire} : l'Isolation Forest appliqué sur
+          les résidus après décomposition (tendance + saisonnalité) fournit
+          une baseline robuste, non supervisée et interprétable, adaptée à
+          l'absence de labels d'anomalies certifiées.
+
+    \item \textbf{Niveau avancé} : l'Anomaly Transformer ou un VAE avec
+          attention permettront de capturer la complexité des interactions
+          multivariées et des ruptures structurelles, notamment autour des
+          épisodes de 2020--2021 et 2024. Une approche hybride combinant
+          un Transformer pour la détection et un VAE pour la quantification
+          de l'incertitude constitue la voie la plus prometteuse.
+\end{enumerate}
+
+Dans tous les cas, les étapes de prétraitement suivantes sont indispensables :
+imputation des valeurs manquantes (interpolation linéaire ou méthode MICE),
+normalisation par série (standardisation z-score), et décomposition STL
+pour séparer tendance, saisonnalité et résidu.
+
+
+% ═════════════════════════════════════════════════════════════════════════════
+\section{Conclusion}
+\label{sec:conclusion}
+% ═════════════════════════════════════════════════════════════════════════════
+
+Cette étude a présenté un état de l'art structuré des méthodes d'intelligence
+artificielle pour la détection de variations atypiques, depuis le LOF
+jusqu'à l'Anomaly Transformer, en passant par les autoencodeurs, les VAE
+et les GAN. Chaque approche a été analysée à la lumière de ses fondements
+théoriques et de ses caractéristiques opérationnelles.
+
+L'application de ces méthodes aux données Monétaires issues
+de la BEAC révèle une cohérence particulièrement forte avec l'Isolation
+Forest, l'Anomaly Transformer et \textbf{MKO-KAN}. Ce dernier, développé
+dans le cadre de ce stage, apporte une dimension supplémentaire : la
+capacité à produire des formules analytiques auditables, alignée avec
+les obligations de traçabilité algorithmique COBAC/BEAC. Le jeu de données,
+riche de 55 séries temporelles mensuelles sur plus de deux décennies,
+offre un terrain d'expérimentation prometteur pour la surveillance
+macroprudentielle dans la zone CEMAC.
+
+
+% ═════════════════════════════════════════════════════════════════════════════
+% BIBLIOGRAPHIE
+% ═════════════════════════════════════════════════════════════════════════════
+\bibliographystyle{plain}
+
+\begin{thebibliography}{99}
+
+\bibitem{pang2021deep}
+Pang, G., Shen, C., Cao, L., \& Van Den Hengel, A. (2021).
+\textit{Deep Learning for Anomaly Detection: A Review}.
+ACM Computing Surveys (CSUR), 54(2), 1--38.
+
+\bibitem{breunig2000lof}
+Breunig, M.M., Kriegel, H.P., Ng, R.T., \& Sander, J. (2000).
+\textit{LOF: Identifying Density-Based Local Outliers}.
+Proceedings of the 2000 ACM SIGMOD International Conference on
+Management of Data, pp.~93--104.
+
+\bibitem{liu2012isolation}
+Liu, F.T., Ting, K.M., \& Zhou, Z.H. (2012).
+\textit{Isolation-Based Anomaly Detection}.
+ACM Transactions on Knowledge Discovery from Data (TKDD), 6(1), Article~3.
+(Version initiale : ICDM 2008, pp.~413--422.)
+
+\bibitem{hinton2006reducing}
+Hinton, G.E., \& Salakhutdinov, R.R. (2006).
+\textit{Reducing the Dimensionality of Data with Neural Networks}.
+Science, 313(5786), 504--507.
+
+\bibitem{zhou2017anomaly}
+Zhou, C., \& Paffenroth, R.C. (2017).
+\textit{Anomaly Detection with Robust Deep Autoencoders}.
+Proceedings of the 23rd ACM SIGKDD International Conference on
+Knowledge Discovery and Data Mining, pp.~665--674.
+
+\bibitem{kingma2013auto}
+Kingma, D.P., \& Welling, M. (2013).
+\textit{Auto-Encoding Variational Bayes}.
+arXiv preprint arXiv:1312.6114.
+
+\bibitem{an2015vae}
+An, J., \& Cho, S. (2015).
+\textit{Variational Autoencoder Based Anomaly Detection Using
+Reconstruction Probability}.
+SNU Data Mining Center Technical Report.
+
+\bibitem{schlegl2017unsupervised}
+Schlegl, T., Seeböck, P., Waldstein, S.M., Schmidt-Erfurth, U., \& Langs, G. (2017).
+\textit{Unsupervised Anomaly Detection with Generative Adversarial Networks
+to Guide Marker Discovery}.
+International Conference on Information Processing in Medical Imaging (IPMI),
+pp.~146--157.
+
+\bibitem{schlegl2019fanogan}
+Schlegl, T., Seeböck, P., Waldstein, S.M., Langs, G., \& Schmidt-Erfurth, U. (2019).
+\textit{f-AnoGAN: Fast Unsupervised Anomaly Detection with Generative
+Adversarial Networks}.
+Medical Image Analysis, 54, 30--44.
+
+\bibitem{xu2022anomaly}
+Xu, J., Wu, H., Wang, J., \& Long, M. (2022).
+\textit{Anomaly Transformer: Time Series Anomaly Detection with Association
+Discrepancy}.
+International Conference on Learning Representations (ICLR 2022, Spotlight).
+
+\bibitem{tanogan2020}
+Bashar, M.A., \& Nayak, R. (2020).
+\textit{TAnoGAN: Time Series Anomaly Detection with Generative Adversarial
+Networks}.
+arXiv preprint arXiv:2008.09567.
+
+\bibitem{shap2025}
+(Collectif). (2025).
+\textit{Inter-layer Explainable Variational Autoencoder Model for Multivariate
+Time Series Anomaly Detection}.
+ScienceDirect, ScienceDirect, doi:10.1016/j.eswa.2025.XXX.
+
+\bibitem{mamba2025}
+(Collectif). (2025).
+\textit{Mamba Adaptive Anomaly Transformer with Association Discrepancy
+for Time Series}.
+ScienceDirect, doi:10.1016/j.engappai.2025.XXX.
+
+\bibitem{liu2024kan}
+Liu, Z., Wang, Y., Vaidya, S., Ruehle, F., Halverson, J., Soljačić, M.,
+Hou, T.Y., \& Tegmark, M. (2024).
+\textit{KAN: Kolmogorov-Arnold Networks}.
+arXiv preprint arXiv:2404.19756.
+
+\bibitem{yanglu2024kan}
+Lu, Y., \& Zhan, F. (2024).
+\textit{Kolmogorov-Arnold Networks in Fraud Detection: Bridging the Gap
+between Theory and Practice}.
+Preprint. University of Cincinnati \& Stanford University.
+5 septembre 2024.
+
+\bibitem{li2024fastkan}
+Li, Z. (2024).
+\textit{FastKAN: Very Fast Implementation of Kolmogorov-Arnold Networks
+(KAN)}.
+GitHub repository. \texttt{https://github.com/ZiyaoLi/fast-kan}
+
+\bibitem{zhou2024kanad}
+Zhou, J. \textit{et al.} (2024).
+\textit{KAN-AD: Anomaly Detection with Kolmogorov-Arnold Networks and
+Fourier Series Edges}.
+Preprint.
+
+\bibitem{haosol2024meta}
+Hao, J.-K., \& Solnon, C. (2024).
+\textit{Méta-heuristiques et intelligence artificielle}.
+Chapitre de livre. Université d'Angers \& INSA Lyon.
+
+\bibitem{moukoko2025mkan}
+Moukoko Ekambi, G.M. (2025).
+\textit{MKO-KAN: Mobile Money KAN Fraud Detector 
+Détection de fraude Mobile Money par réseaux de Kolmogorov-Arnold hybrides
+en zone CEMAC}.
+Rapport de stage, Banque des États de l'Afrique Centrale (BEAC).
+ENSPD / Université de Douala, LIDIA Laboratory.
+
+\end{thebibliography}
+
+\end{document}

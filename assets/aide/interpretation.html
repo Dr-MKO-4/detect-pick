@@ -1,0 +1,39 @@
+<h2 style="color:#7a4f00">Interprétation des résultats</h2>
+
+<h3>Scores et seuils</h3>
+<ul>
+  <li><b>LOF* = 1</b> : comportement strictement conforme au voisinage (aucune anomalie).</li>
+  <li><b>LOF* &gt; 1</b> : densité locale inférieure à celle des voisins &rarr; potentielle anomalie.</li>
+  <li><b>LOF* &gt; &tau;</b> (&tau; = Q3 + 1,5&middot;IQR) : anomalie confirmée selon la règle de Tukey.</li>
+  <li><b>s_discrim &gt; q&#x0302;&rsquo;&#x2080;&period;&#x2085;&rsquo;</b> : anomalie BiVAT au niveau 95% de couverture conforme.</li>
+</ul>
+
+<h3>Types d&rsquo;anomalies (Fig. G)</h3>
+<table border="0" cellpadding="6">
+<tr><td><b>Ponctuelle</b></td>
+    <td>Détectée par LOF* uniquement. Valeur extrême isolée sur 1&ndash;2 mois.</td></tr>
+<tr><td><b>Contextuelle</b></td>
+    <td>Détectée par BiVAT uniquement. Anomale par rapport au contexte temporel
+    mais pas en valeur absolue (rupture de régime).</td></tr>
+<tr><td><b>Collective</b></td>
+    <td>Les deux modèles concordent sur &ge; 3 mois consécutifs. Signal persistant.</td></tr>
+<tr><td><b>Systémique</b></td>
+    <td>&ge; 3 pays CEMAC dépassent simultanément leur seuil national.
+    Indique un choc supra-national (ex. COVID-19 : mars 2020 &ndash; déc. 2021).</td></tr>
+</table>
+
+<h3>Fig. 12 &mdash; Contributeurs</h3>
+<p>Les barres <span style="color:red"><b>rouges</b></span> indiquent un résidu <b>positif</b>
+(valeur au-dessus de la tendance), les barres <span style="color:#1565c0"><b>bleues</b></span>
+indiquent un résidu <b>négatif</b>. Plus la barre est longue, plus l&rsquo;indicateur contribue
+à l&rsquo;anomalie du mois sélectionné.</p>
+
+<h3>Fig. 14 &mdash; Lecture de la heatmap inter-pays</h3>
+<p>Chaque cellule indique le score LOF* normalisé du pays (ligne) pour le mois (colonne).
+Le panneau latéral droit affiche le nombre de pays simultanément en alerte : une valeur &ge; 3
+(ligne pointillée rouge) signale un événement systémique.</p>
+
+<h3>Bande COVID (Fig. E bis)</h3>
+<p>La zone grisée (mars 2020 &ndash; déc. 2021) signale la période de rupture de régime liée à
+la pandémie COVID-19. Les intervalles de prédiction conforme sont élargis sur cette période
+pour éviter les fausses alarmes dues au choc externe.</p>

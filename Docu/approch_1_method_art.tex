@@ -1,0 +1,1528 @@
+\documentclass[12pt,a4paper]{article}
+
+% ── Encodage et langue ──────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+
+% ── Mise en page ─────────────────────────────────────────────────
+\usepackage[top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% ── Mathématiques ────────────────────────────────────────────────
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{mathtools}
+\usepackage{bm}
+
+% ── Tableaux ─────────────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{pdflscape}
+
+% ── Typographie ──────────────────────────────────────────────────
+\usepackage{microtype}
+\usepackage{lmodern}
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+% ── Liens ────────────────────────────────────────────────────────
+\usepackage[colorlinks=true, linkcolor=black, citecolor=black,
+            urlcolor=black]{hyperref}
+
+% ── En-tête / pied de page ───────────────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{Méthodologie LOF  Baseline de référence}}
+\fancyhead[R]{\small\textit{MOUKOKO EKAMBI G.M.}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ── Sections ─────────────────────────────────────────────────────
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\itshape}{\thesubsubsection}{0.5em}{}
+
+% ── Commandes utilitaires ────────────────────────────────────────
+\newcommand{\nd}{--}
+
+% ── Bibliographie ────────────────────────────────────────────────
+\usepackage{natbib}
+
+% ════════════════════════════════════════════════════════════════
+\begin{document}
+
+% ── Page de titre ────────────────────────────────────────────────
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+
+{\LARGE\bfseries
+DÉTECTION D'ANOMALIES DANS LES DONNÉES MONÉTAIRES BEAC-CEMAC\\[0.4em]
+\large\normalfont
+Modèle 1 : Local Outlier Factor comme baseline de référence 
+Justification, pipeline et comparaison avec BiVAT\\[0.4em]
+}
+
+\vspace{2cm}
+
+{\large\bfseries MOUKOKO EKAMBI GEORGES MIGUEL}\\[0.5em]
+{\normalsize\itshape
+Stagiaire, Banque des États de l'Afrique Centrale (BEAC)\\
+M2 Data Science \& IA  ENSPD / Université de Douala, LIDIA Laboratory
+}
+
+\vspace{2cm}
+
+{\normalsize Août 2026}
+
+\vfill
+
+{\small
+Document rédigé dans le cadre du stage de recherche à la Banque des États
+de l'Afrique Centrale (BEAC), M2 Data Science \& IA,
+ENSPD / Université de Douala  LIDIA Laboratory.
+}
+\end{titlepage}
+
+% ── Résumé ───────────────────────────────────────────────────────
+\begin{abstract}
+Ce document présente la méthodologie complète du Modèle~1 d'une étude
+comparative à deux niveaux portant sur la détection non supervisée de
+variations atypiques dans les données monétaires des Autres Sociétés de
+Dépôts (2SR) de la zone CEMAC. Le Modèle~1 est le Local Outlier Factor
+(LOF), retenu comme baseline de référence parmi huit méthodes concurrentes
+sur la base de critères empiriques documentés. Trois contributions structurent
+ce document. Premièrement, une justification empirique du choix du LOF parmi
+les méthodes de détection d'anomalies classiques, appuyée sur des benchmarks
+publiés et cinq publications institutionnelles BIS/BCE/Banca d'Italia.
+Deuxièmement, la documentation des cinq lacunes structurelles du LOF 
+ignorance des dépendances temporelles, dégénérescence en haute dimension,
+absence de quantification d'incertitude, inexplicabilité par indicateur, et
+instabilité des scores  qui motivent le passage au Modèle~2 (BiVAT).
+Troisièmement, un protocole de comparaison entre les deux modèles sans labels
+ground truth, fondé sur des métriques d'évaluation non supervisée adaptées au
+contexte de surveillance macroprudentielle BEAC-CEMAC.
+
+\bigskip
+\noindent\textbf{Mots-clés :} détection d'anomalies non supervisée, Local
+Outlier Factor, densité locale, séries temporelles financières, BEAC, CEMAC,
+pipeline de prétraitement, baseline comparative, BiVAT.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ════════════════════════════════════════════════════════════════
+\section{Introduction}
+
+\subsection{Cadre général de l'étude}
+
+Ce document s'inscrit dans une étude comparative à deux modèles portant sur
+la détection non supervisée de variations atypiques dans les données monétaires
+de la Banque des États de l'Afrique Centrale (BEAC). Le Modèle~1, objet du
+présent document, est le Local Outlier Factor (LOF), algorithme classique de
+détection d'anomalies fondé sur la densité locale relative des observations.
+Le Modèle~2, documenté séparément, est BiVAT (\textit{Bidirectional
+VAE-Associative Transformer}), une architecture hybride profonde combinant
+autoencodeur variationnel et Transformer bidirectionnel.
+
+L'architecture de l'étude repose sur une logique de progression justifiée :
+le LOF est choisi comme baseline parce qu'il est le meilleur compromis
+disponible parmi les méthodes classiques non supervisées pour le contexte
+BEAC (section~2), mais ses lacunes structurelles documentées (section~5)
+motivent précisément la construction de BiVAT comme réponse architecturale
+à chacune de ces lacunes. Le protocole de comparaison entre les deux modèles
+(section~8) permet d'objectiver empiriquement ce gain sur les données BEAC
+réelles en l'absence de labels d'anomalies certifiés.
+
+\subsection{Le dataset BEAC-CEMAC}
+
+Le dataset de référence regroupe les situations de l'actif et du passif des
+Autres Sociétés de Dépôts (2SR) des six États membres de la CEMAC (Cameroun,
+Congo, Gabon, Guinée équatoriale, RCA, Tchad), selon la nomenclature IFS du
+FMI. Il se présente sous la forme de douze fichiers au format XLSX organisés
+selon la nomenclature
+\texttt{clean\_<pays>\_beac\_mapping\_2SR\_<Actif|Passif>.xlsx}.
+
+Les caractéristiques structurelles de ce dataset conditionnent l'ensemble
+des choix méthodologiques documentés dans ce travail.
+
+\textit{Volume temporel.} Chaque fichier couvre environ 195 observations
+mensuelles (décembre~2001 à mars~2026) pour le Cameroun, avec des couvertures
+potentiellement plus courtes pour les pays à système bancaire moins développé
+(RCA, Guinée équatoriale).
+
+\textit{Dimensionnalité.} Environ 55 indicateurs financiers par fichier,
+répartis en grandes catégories de bilan : Numéraire et Dépôts, Titres,
+Crédits, Actions, Réserves Techniques d'Assurance, Autres Comptes à Recevoir
+et Crédits Commerciaux. Les valeurs sont exprimées en milliards de FCFA.
+
+\textit{Hétérogénéité inter-pays.} Les économies CEMAC présentent des
+structures bancaires très hétérogènes : une même valeur absolue d'un agrégat
+peut être parfaitement normale au Cameroun et extrême en RCA. Cette
+hétérogénéité interdit toute comparaison normalisée directe et impose un
+traitement séparé par pays.
+
+\textit{Absence de labels certifiés.} Il n'existe pas d'étiquettes historiques
+d'anomalies certifiées par un processus d'audit formalisé. La détection est
+intrinsèquement non supervisée : les deux modèles produisent des scores
+ordinaux dont la validation s'appuie sur des événements économiques documentés.
+
+\textit{Ruptures structurelles documentées.} Le choc pétrolier 2014--2016,
+la crise sécuritaire camerounaise à partir de 2017, le choc COVID-19 en
+2020--2021 et les dynamiques post-pandémiques 2022--2024 constituent des
+événements de référence pour la validation externe des détections.
+
+% ════════════════════════════════════════════════════════════════
+\section{Sélection de l'Algorithme : Pourquoi le LOF}
+
+\subsection{Taxonomie des méthodes candidates}
+
+La détection non supervisée d'anomalies dans des données multivariées repose
+sur un ensemble de méthodes organisées en quatre familles selon le principe
+de discrimination qu'elles mobilisent.
+
+\textbf{Famille~1  Méthodes statistiques classiques.} Ces méthodes
+supposent un modèle paramétrique de la distribution des données normales et
+signalent les observations qui s'en écartent au-delà d'un seuil. Le
+Z-score univarié, la distance de Mahalanobis multivariée et le seuillage
+des résidus de modèles ARIMA ou VAR appartiennent à cette famille. Leur
+limitation fondamentale est double : elles supposent la stationnarité de la
+distribution des données normales, et elles supposent en général une
+distribution paramétrique (gaussienne) que les données financières violent
+systématiquement (queues épaisses, leptokurtose, régimes changeants).
+
+\textbf{Famille~2  Méthodes à distance globale.} Ces méthodes évaluent
+l'anomalie d'un point par sa distance aux autres observations dans un espace
+global unique. La méthode kNN-distance (distance au k-ième plus proche voisin)
+et le DB-outlier de Knorr \& Ng (1998) appartiennent à cette famille. Leur
+limitation est l'utilisation d'une densité globale implicite qui ne s'adapte
+pas aux variations locales de densité  défaut critique pour des données
+financières où les régimes pré et post-crise présentent des densités très
+différentes dans l'espace des indicateurs.
+
+\textbf{Famille~3  Méthodes à densité locale.} Ces méthodes évaluent
+l'anomalie d'un point relativement à la densité de son voisinage immédiat,
+permettant de détecter des outliers dans des données à densité variable. Le
+LOF (Breunig et al.\ 2000), le COF (Tang et al.\ 2002), le LOCI (Papadimitriou
+et al.\ 2003), le LoOP (Kriegel et al.\ 2009), l'INFLO (Jin et al.\ 2006)
+et le LDOF (Zhang et al.\ 2009) appartiennent à cette famille.
+
+\textbf{Famille~4  Méthodes d'ensemble et par isolement.} Ces méthodes
+ne reposent pas sur la densité locale. L'Isolation Forest (Liu et al.\ 2008)
+isole les anomalies par partitionnement aléatoire de l'espace. La One-Class
+SVM (Schölkopf et al.\ 2001) apprend une frontière autour des données normales
+dans un espace noyau. L'Elliptic Envelope suppose une distribution gaussienne
+multivariée. DBSCAN en mode détection d'anomalies traite les points
+non-assignés à un cluster comme outliers.
+
+\subsection{Critères de sélection spécifiques au contexte BEAC}
+
+Le choix de l'algorithme baseline est conditionné par cinq contraintes
+structurelles du dataset BEAC qui éliminent certaines familles de méthodes
+indépendamment de leurs performances générales.
+
+\textit{Contrainte C1  Petit volume ($N = 195$).} L'Isolation Forest est
+documenté comme sous-optimal sur des datasets de moins de 1\,000 observations
+(Liu et al.\ 2008, ICDM) : son mécanisme d'isolement par partitionnement
+aléatoire converge lentement sur petit volume. Les méthodes nécessitant
+l'estimation d'une matrice de covariance de dimension $55 \times 55$
+(Mahalanobis, Elliptic Envelope) sont numériquement instables quand
+$N \approx 55 \times 3 = 165$ observations effectives après décomposition STL.
+
+\textit{Contrainte C2  Dimension $D = 55$.} La malédiction de la
+dimensionnalité affecte toutes les méthodes à base de distance. Zimek,
+Schubert \& Kriegel (2012) identifient huit problèmes distincts pour les
+méthodes à base de densité en haute dimension, dont la concentration des
+distances qui rend le concept de voisinage non discriminant au-delà de
+$D \approx 20$. Cette contrainte impose une réduction de dimension préalable
+pour toutes les méthodes de la famille~2 et de la famille~3 (section~4.5).
+
+\textit{Contrainte C3  Densité variable entre régimes.} Le dataset BEAC
+présente des régimes macroéconomiques successifs avec des densités très
+différentes dans l'espace des indicateurs : la période 2015--2019 (choc
+pétrolier, ajustement) a une dynamique structurellement différente de la
+période 2020--2023 (COVID-19, rebond). Les méthodes à distance globale
+(Famille~2) et les méthodes supposant un cluster compact unique (One-Class
+SVM) sont inadaptées à ce contexte. La densité locale relative du LOF est
+structurellement adaptée aux données multi-régimes.
+
+\textit{Contrainte C4  Absence de labels.} Toutes les méthodes supervisées
+et semi-supervisées sont exclues d'emblée. Parmi les méthodes non supervisées,
+celles qui nécessitent un ensemble de données normales certifié pour
+l'entraînement (Deep SVDD, One-Class SVM avec noyau complexe) sont
+difficiles à calibrer sans labels.
+
+\textit{Contrainte C5  Exigence de reproductibilité institutionnelle.} Dans
+le contexte BEAC/COBAC, la méthode doit être transparente, documentée et
+reproductible. Les méthodes dont le comportement dépend de l'initialisation
+aléatoire (Isolation Forest avec graines différentes) ou d'hyperparamètres
+non documentés dans la littérature institutionnelle sont moins défendables
+dans un rapport de surveillance macroprudentielle.
+
+\subsection{Comparaison empirique des méthodes candidates}
+
+\subsubsection{Résultats sur les datasets de référence}
+
+Le tableau~\ref{tab:selection} présente les résultats empiriques comparatifs
+des méthodes candidates sur les datasets de référence du domaine (SMD, MSL,
+SMAP, SWaT, PSM) issus de Xu et al.\ (2022, ICLR, Table~1) et MEMTO
+(arXiv:2312.02530, Table~1), ainsi que sur des données financières multivariées
+réelles issues de arXiv:2209.11686 (Table~23--24).
+
+\begin{longtable}{p{3.5cm}ccccccp{2.5cm}}
+\caption{Comparaison empirique des méthodes candidates  F1-score (\%) sur
+datasets de référence et données financières.}
+\label{tab:selection}\\
+\toprule
+\textbf{Méthode} & \textbf{SMD} & \textbf{MSL} & \textbf{SMAP} &
+\textbf{SWaT} & \textbf{PSM} & \textbf{Fin.} & \textbf{Source} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Méthode} & \textbf{SMD} & \textbf{MSL} & \textbf{SMAP} &
+\textbf{SWaT} & \textbf{PSM} & \textbf{Fin.} & \textbf{Source} \\
+\midrule
+\endhead
+\bottomrule\endlastfoot
+
+Z-score & \nd & \nd & \nd & \nd & \nd & Très faible &
+Univarié, exclu C2 \\
+\midrule
+Mahalanobis & \nd & \nd & \nd & \nd & \nd & Modérée &
+Instable $N \approx D$, exclu C1 \\
+\midrule
+kNN-distance & \nd & \nd & \nd & \nd & \nd & \nd &
+Densité globale, inférieur LOF \\
+\midrule
+DBSCAN & \nd & \nd & \nd & \nd & \nd & 26.46 &
+arXiv:2209.11686 \\
+\midrule
+Isolation Forest & 53.64 & 66.45 & 55.53 & 47.02 & 83.48 & 17.82 &
+Xu 2022 T.1 ; arXiv:2209.11686 \\
+\midrule
+OCSVM & 56.19 & 70.82 & 56.34 & 47.23 & 70.67 & 39.00 &
+Xu 2022 T.1 ; arXiv:2209.11686 \\
+\midrule
+\textbf{LOF} & \textbf{46.68} & \textbf{61.18} & \textbf{57.60} &
+\textbf{68.62} & \textbf{70.61} & \textbf{33.33} &
+Xu 2022 T.1 ; arXiv:2209.11686 \\
+\midrule
+LoOP & \nd & \nd & \nd & \nd & \nd & \nd &
+Variante LOF, voir \S\ref{subsec:loop} \\
+\midrule
+\textit{OmniAnomaly} & \textit{85.22} & \textit{87.67} & \textit{86.92} &
+\textit{82.83} & \textit{80.83} & \nd &
+\textit{Xu 2022 T.1  Modèle profond} \\
+\midrule
+\textit{BiVAT (cible)} & \textit{$\geq$92} & \textit{$\geq$93} &
+\textit{$\geq$96} & \textit{$\geq$94} & \textit{$\geq$97} & \nd &
+\textit{Modèle 2 de l'étude} \\
+\end{longtable}
+
+\textit{Note sur le protocole d'évaluation.} Les résultats sur SMD/MSL/SMAP/SWaT/PSM
+utilisent le protocole \textit{point adjustment} (PA) : si au moins un point
+d'un segment anormal est détecté, tout le segment est crédité. Ce protocole
+tend à gonfler les scores par rapport à une évaluation strictement
+point-à-point. Les résultats sur données financières (colonne Fin.) sont issus
+d'un benchmark sur données de marché multivariées réelles sans point adjustment
+(arXiv:2209.11686).
+
+\subsubsection{Analyse comparative par famille}
+
+\textbf{Méthodes statistiques classiques.} Le Z-score est structurellement
+exclu par la contrainte C2 : il est univarié par construction et ne capture
+pas les anomalies multivariées résultant de combinaisons anormales entre les
+55 indicateurs IFS. Chandola, Banerjee \& Kumar (2009) formalisent cette
+limitation : le Z-score détecte uniquement les anomalies ponctuelles
+marginales, mais rate les anomalies contextuelles et collectives qui sont
+précisément les plus pertinentes dans le contexte de surveillance
+macroprudentielle. La distance de Mahalanobis est exclue par la contrainte
+C1 : l'estimation stable d'une matrice de covariance $55 \times 55$ requiert
+au minimum $55 \times 5 = 275$ observations, supérieur à $N = 195$. De plus,
+comme méthode globale, elle suppose la stationnarité de la distribution normale,
+violée par les changements de régime CEMAC. DOD (arXiv:2511.02199) confirme
+que la distance de Mahalanobis ``degrades severely in high dimensions due to
+the curse of dimensionality'' (Zimek et al.\ 2012).
+
+\textbf{Méthodes à densité locale concurrentes du LOF.} Plusieurs variantes
+du LOF sont disponibles dans la Famille~3. Le COF (Tang et al.\ 2002) utilise
+un chemin de connectivité au lieu de la distance euclidienne, offrant un
+avantage théorique sur les clusters non sphériques, mais son coût
+computationnel $\mathcal{O}(n^2 k)$ supérieur à celui du LOF $\mathcal{O}(nk^2)$
+est injustifié pour $N = 195$. Goldstein \& Uchida (2016) montrent que COF et
+LOF ont des performances comparables sur données de dimension modérée. Le LOCI
+(Papadimitriou et al.\ 2003) supprime le paramètre MinPts via un calcul
+automatique, mais sa complexité $\mathcal{O}(n^2)$ en temps et en espace est
+prohibitive pour $D = 55$. L'INFLO (Jin et al.\ 2006) intègre le voisinage
+direct et inverse pour réduire les faux positifs aux frontières de clusters,
+mais ne fournit pas de décomposition par indicateur. Le LDOF (Zhang et al.\
+2009) est documenté comme plus stable que le LOF sur données éparses, mais
+aucun benchmark sur données financières n'est disponible.
+
+\textbf{Isolation Forest.} L'IF est compétitif sur les datasets industriels
+(F1 = 83.48 sur PSM) mais inférieur au LOF sur les données financières
+multivariées réelles (F1 = 17.82 vs 33.33, arXiv:2209.11686). Liu et al.\
+(2008, ICDM original) documentent que l'IF est ``most accurate for data sets
+larger than one thousand points'' : sur $N = 195$ (contrainte C1), son mécanisme
+d'isolement par partitionnement aléatoire converge lentement et ses
+performances se dégradent. Sur le dataset SWaT, le LOF dépasse l'IF de 21.60
+points de F1 (68.62 vs 47.02, Xu et al.\ 2022), illustrant la supériorité
+du LOF sur les données à densité hétérogène entre régimes. Goldstein \& Uchida
+(2016) confirment que le LOF est généralement supérieur à l'IF sur les données
+à densité variable.
+
+\textbf{One-Class SVM.} L'OCSVM est compétitif sur MSL (F1 = 70.82) et sur
+données financières (F1 = 39.00 vs 33.33 pour LOF sur arXiv:2209.11686), mais
+il suppose que les données normales forment un cluster compact dans l'espace
+noyau. Cette hypothèse est fondamentalement inadaptée aux données BEAC où la
+distribution normale évolue entre régimes macroéconomiques distincts
+(contrainte C3). L'OCSVM requiert également une calibration délicate du noyau
+et du paramètre $\nu$ sans garantie de stabilité sur données non stationnaires.
+
+\textbf{DBSCAN.} En mode détection d'anomalies, DBSCAN traite les points
+non-assignés à un cluster comme outliers. Sur données financières multivariées,
+sa F1 = 26.46 est inférieure à celle du LOF (33.33, arXiv:2209.11686). De
+plus, DBSCAN produit une décision binaire (outlier/inlier) sans score continu,
+ce qui interdit le classement ordinal des anomalies par sévérité  exigence
+opérationnelle fondamentale dans le contexte BEAC.
+
+\subsection{Décision de sélection : le LOF comme baseline}
+
+Le LOF est retenu comme algorithme baseline pour trois raisons complémentaires
+et documentées.
+
+\textit{Première raison  Supériorité empirique dans le contexte
+$N < 1\,000$ et données financières.} Sur données financières multivariées
+réelles, le LOF obtient F1 = 33.33\%, supérieur à l'IF (17.82\%), DBSCAN
+(26.46\%) et comparable à l'OCSVM (39.00\%, mais inadapté aux données
+multi-régimes). Sur les datasets industriels à densité hétérogène (SWaT),
+le LOF dépasse l'IF de 21.60 points de F1 (Xu et al.\ 2022). La combinaison
+$N = 195$, $D = 55$ et densité variable entre régimes place le dataset BEAC
+dans le domaine de compétence documenté du LOF.
+
+\textit{Deuxième raison  Légitimité institutionnelle documentée.} Le LOF
+est explicitement référencé comme méthode de baseline dans au moins cinq
+publications institutionnelles de surveillance bancaire : BIS IFC Bulletin~66
+(2024) le cite comme référence pour la détection d'anomalies dans les données
+bancaires ; Bank of Italy Occasional Paper~689 (Maddaloni et al., 2022) l'applique
+aux données de reporting AnaCredit multi-sources ; BCE DG Statistics
+(Accornero \& Boscariol, 2021) l'utilise sur données de reporting bancaire BCE ;
+Banco de Portugal (Costa et al.\ 2021) l'applique au registre de crédit et
+documente explicitement que les méthodes traditionnelles comme le LOF
+``will (in general) perform poorly'' au-delà d'une certaine complexité, justifiant
+le passage vers des méthodes plus sophistiquées ; BIS IFC Bulletin~57 (2022)
+utilise des méthodes à densité (DBSCAN, Affinity Propagation) dans un contexte
+opérationnel similaire.
+
+\textit{Troisième raison  Adéquation structurelle au problème de densité
+variable.} La définition du LOF repose sur la densité locale relative : un
+point est anomalie si sa densité locale est faible comparativement à celle
+de ses voisins, indépendamment de la densité globale du dataset. Cette
+propriété est précisément adaptée aux données BEAC où les régimes
+macroéconomiques successifs créent des zones de densité très différentes dans
+l'espace des 55 indicateurs. Les méthodes à densité globale (Z-score,
+Mahalanobis, kNN-distance) mesurent l'écart à la distribution moyenne sur
+toute la période, confondant ainsi les anomalies réelles avec les simples
+changements de régime.
+
+\subsection{LoOP : variante probabiliste non retenue}
+\label{subsec:loop}
+
+LoOP (\textit{Local Outlier Probabilities}, Kriegel et al.\ 2009,
+DOI:~10.1145/1645953.1646195) est une variante directe du LOF qui transforme
+les scores en probabilités d'anomalie dans $[0,1]$ via la fonction d'erreur
+gaussienne appliquée au ratio PLOF/nPLOF. Son avantage principal est
+l'interprétabilité directe du score comme probabilité, sans nécessiter de
+seuillage préalable.
+
+LoOP n'est pas retenu dans ce pipeline pour deux raisons précises. D'une part,
+LoOP hérite de la même sensibilité à MinPts que le LOF standard : les
+probabilités produites dépendent du choix du voisinage de la même manière que
+les scores LOF bruts. D'autre part, l'interprétabilité probabiliste du score
+est intégralement gérée dans ce pipeline par la Conformal Prediction post-hoc
+(section~8.3), qui produit des intervalles de confiance à garantie formelle
+$\Pr(\hat{y} \in C_\alpha) \geq 1 - \alpha$  supérieurs aux probabilités
+LoOP qui supposent une distribution half-gaussienne des distances, hypothèse
+non vérifiable sur données financières à régimes multiples. LoOP devient donc
+redondant dans l'architecture pipeline retenue.
+% ════════════════════════════════════════════════════════════════
+\section{Cadre Théorique du LOF}
+
+\subsection{\textit{k}-distance et voisinage}
+
+Soit $\mathcal{D}$ l'ensemble des observations de l'espace résiduel normalisé
+après décomposition STL et réduction par RPCA (sections~4.3 et~4.5). Pour un
+entier $k \geq 1$ et un point $p \in \mathcal{D}$, la \textbf{\textit{k}-distance}
+de $p$, notée $k\text{-dist}(p)$, est la distance $d(p, o)$ vers un objet
+$o \in \mathcal{D}$ tel qu'au moins $k$ objets $o' \neq p$ vérifient
+$d(p, o') \leq d(p, o)$ et au plus $k-1$ vérifient $d(p, o') < d(p, o)$
+(Breunig et al.\ 2000, Déf.~3). Dans le contexte BEAC, $p$ représente un
+mois $t$ dans l'espace des résidus réduit, et $d$ est la distance euclidienne
+dans cet espace après réduction de dimension.
+
+Le \textbf{voisinage de \textit{k}-distance} de $p$ est l'ensemble des points
+situés à une distance inférieure ou égale à $k\text{-dist}(p)$ :
+$$\mathcal{N}_k(p) = \bigl\{\, q \in \mathcal{D} \setminus \{p\}
+\mid d(p, q) \leq k\text{-dist}(p) \,\bigr\}$$
+(Breunig et al.\ 2000, Déf.~4). La cardinalité de $\mathcal{N}_k(p)$ peut
+être supérieure à $k$ en cas d'équidistance de plusieurs points, phénomène
+possible sur les données BEAC en raison de la faible variance de certains
+indicateurs sur des sous-périodes de stabilité monétaire.
+
+\subsection{Distance de joignabilité}
+
+La \textbf{distance de joignabilité} (\textit{reachability distance}) de $p$
+par rapport à $o$ (Breunig et al.\ 2000, Déf.~5) est :
+$$\mathrm{reach\text{-}dist}_k(p, o) = \max \bigl\{
+k\text{-dist}(o),\; d(p, o)
+\bigr\}$$
+
+Si $p$ est éloigné de $o$, la distance réelle $d(p, o)$ est retenue. Si $p$
+est très proche de $o$  c'est-à-dire si $p$ se trouve à l'intérieur du
+voisinage de $k$-distance de $o$  la distance est plafonnée à
+$k\text{-dist}(o)$. Ce plafonnement réduit les fluctuations statistiques
+locales induites par des configurations dégénérées où plusieurs points sont
+presque coïncidents, situation possible sur les données BEAC pour des
+indicateurs présentant de longues périodes de stagnation nominale.
+
+\subsection{Densité locale de joignabilité}
+
+La \textbf{densité locale de joignabilité} (\textit{local reachability density})
+de $p$ (Breunig et al.\ 2000, Déf.~6) est l'inverse de la distance de
+joignabilité moyenne vers les voisins de $p$ :
+$$\mathrm{lrd}_k(p) = \left(
+\frac{\displaystyle\sum_{o \in \mathcal{N}_k(p)}
+\mathrm{reach\text{-}dist}_k(p, o)}
+{\left|\mathcal{N}_k(p)\right|}
+\right)^{-1}$$
+
+Un $\mathrm{lrd}_k(p)$ élevé indique que $p$ est situé dans une région dense
+de l'espace résiduel  son comportement mensuel est similaire à celui de
+plusieurs mois voisins, ce qui caractérise un comportement normal dans le
+contexte BEAC. Inversement, un $\mathrm{lrd}_k(p)$ faible signale que $p$ est
+isolé dans l'espace résiduel, première indication d'une déviation atypique.
+
+\subsection{Facteur d'anomalie local}
+
+Le \textbf{facteur d'anomalie local} de $p$ (Breunig et al.\ 2000, Déf.~7)
+est le rapport moyen entre la densité locale de joignabilité des voisins de
+$p$ et celle de $p$ lui-même :
+$$\mathrm{LOF}_k(p) =
+\frac{\displaystyle\sum_{o \in \mathcal{N}_k(p)}
+\dfrac{\mathrm{lrd}_k(o)}{\mathrm{lrd}_k(p)}}
+{\left|\mathcal{N}_k(p)\right|}$$
+
+Un $\mathrm{LOF}_k(p) \approx 1$ caractérise un point normal : sa densité
+locale est comparable à celle de ses voisins. Un $\mathrm{LOF}_k(p) \gg 1$
+signale une anomalie locale : $p$ est situé dans une région beaucoup moins
+dense que ses voisins immédiats. Appliqué aux données BEAC, un mois $t$
+recevra un LOF élevé si ses résidus STL constituent une déviation simultanée
+et atypique de plusieurs indicateurs du bilan par rapport à la dynamique
+habituelle de ces indicateurs sur les mois voisins.
+
+\subsection{Propriétés théoriques et bornes}
+
+Breunig et al.\ (2000, Théorèmes~1 et~2) établissent des bornes générales
+sur le facteur LOF en fonction des distances de joignabilité directes et
+indirectes. Pour un point $p$ profondément intégré dans un cluster
+$\mathcal{C}$ de densité uniforme, $\mathrm{LOF}_k(p)$ tend vers~1. Pour un
+point $p$ isolé à une distance $d_{\min}$ du cluster le plus proche, le LOF
+croît avec $d_{\min}$ et avec l'homogénéité du cluster environnant.
+
+La propriété fondamentale du LOF pour le contexte BEAC est sa relativité
+locale : deux points situés dans des régions de densités très différentes
+(par exemple un mois de 2010 en régime de stabilité et un mois de 2021 en
+régime post-COVID) peuvent recevoir le même score LOF s'ils sont également
+anomaux relativement à leur contexte local respectif. Cette propriété est
+précisément ce qui distingue le LOF des méthodes à distance globale et le
+rend adapté aux données à régimes multiples.
+
+\subsection{Stratégie de la plage de valeurs pour MinPts}
+
+Le seul hyperparamètre du LOF est $\mathrm{MinPts}$, qui fixe le nombre de
+voisins utilisé pour estimer la densité locale. Breunig et al.\ (2000,
+Section~6.1) démontrent que le score LOF n'évolue pas de manière monotone
+avec $\mathrm{MinPts}$ : pour un même point, augmenter $\mathrm{MinPts}$
+peut alternativement augmenter, diminuer ou stabiliser son LOF selon la
+structure locale du voisinage.
+
+Pour pallier cette instabilité, Breunig et al.\ (2000, Section~6.2) proposent
+d'utiliser une plage de valeurs $[\mathrm{MinPts}_\mathrm{LB},\,
+\mathrm{MinPts}_\mathrm{UB}]$ et de retenir pour chaque point le score
+maximum :
+$$\mathrm{LOF}^*(p) = \max \bigl\{
+\mathrm{LOF}_{\mathrm{MinPts}}(p) \mid
+\mathrm{MinPts}_\mathrm{LB} \leq \mathrm{MinPts} \leq
+\mathrm{MinPts}_\mathrm{UB}
+\bigr\}$$
+
+Le maximum met en évidence l'instance à laquelle le point est le plus isolé,
+tandis que la moyenne diluerait ce caractère atypique. Pour le dataset BEAC
+($N \approx 195$), la plage retenue est $[10, 30]$, correspondant à une borne
+inférieure garantissant la stabilité statistique (règle pratique de Breunig
+et al.) et à une borne supérieure de 30 mois (2,5 ans) cohérente avec la durée
+des cycles macroéconomiques CEMAC. Pour les pays à volume réduit (RCA, Guinée
+équatoriale), la borne supérieure est adaptée à
+$\mathrm{MinPts}_\mathrm{UB} = \lfloor n/5 \rfloor$ afin de maintenir
+un rapport $\mathrm{MinPts}/n$ cohérent avec les recommandations de Breunig
+et al.
+
+% ════════════════════════════════════════════════════════════════
+\section{Pipeline d'Implémentation}
+
+\subsection{Architecture multi-fichiers et mode d'exécution}
+
+\subsubsection{Inventaire des sources}
+
+Le dossier de données contient douze fichiers au format XLSX organisés selon
+la nomenclature \texttt{clean\_<pays>\_beac\_mapping\_2SR\_<Actif|Passif>.xlsx},
+couvrant les six États membres de la CEMAC (Cameroun, Congo, Gabon, Guinée
+équatoriale, RCA, Tchad) sur les deux volets comptables Actif et Passif.
+Chaque fichier est organisé en format large : chaque ligne représente un
+indicateur financier identifié par son code IFS, et chaque colonne correspond
+à une période mensuelle au format \texttt{AAAMyy}.
+
+\subsubsection{Mode d'exécution séparé}
+
+Trois architectures d'exécution sont envisageables : mode séparé (pipeline
+complet exécuté indépendamment sur chacun des douze fichiers), mode pool
+CEMAC (concaténation des douze fichiers avant exécution), et mode
+hiérarchique (combinaison des deux niveaux). Le mode séparé est retenu pour
+trois raisons structurelles.
+
+Premièrement, la comparabilité inter-pays est structurellement inadéquate.
+Les économies CEMAC présentent des structures bancaires très hétérogènes :
+une même valeur absolue d'un agrégat peut être parfaitement normale au
+Cameroun et extrême en RCA. Dans un pool CEMAC ($n \approx 195 \times 12 =
+2\,340$), le LOF mesurerait l'écart à la distribution CEMAC composite plutôt
+que l'anomalie propre à chaque pays, perdant toute signification économique.
+
+Deuxièmement, la calibration de MinPts serait invalidée. Dans un pool de
+2\,340 observations, le paramètre MinPts devrait être recalibré sur une base
+douze fois plus grande, et son interprétation en termes de cycles de référence
+annuels perdrait son ancrage économique.
+
+Troisièmement, seul le mode séparé produit une interprétation économique
+directe. Un score LOF élevé en avril~2020 au Cameroun doit être lu comme une
+anomalie dans la dynamique bancaire camerounaise, et non comme une position
+marginale dans un espace CEMAC composite. Le mode pool est conservé comme
+variante d'exploration pour la détection d'anomalies systémiques simultanément
+présentes dans plusieurs pays (section~\ref{sec:validation}).
+
+\subsubsection{Cohérence comptable Actif--Passif}
+
+L'identité fondamentale du bilan, $\mathrm{Total\;Actif} =
+\mathrm{Total\;Passif}$, constitue un mécanisme de validation interne. Pour
+chaque pays, les scores LOF obtenus sur le fichier Actif sont confrontés à
+ceux obtenus sur le fichier Passif. Une anomalie concordante (signal sur les
+deux volets au même mois) indique un événement économique réel affectant la
+structure du bilan dans son ensemble. Une anomalie discordante (signal sur
+un seul volet) suggère prioritairement une erreur de collecte ou un problème
+de réconciliation comptable.
+
+\subsection{Imputation des valeurs manquantes}
+
+\subsubsection{Identification des types de lacunes}
+
+Les fichiers sources présentent deux catégories de valeurs manquantes
+aux mécanismes de génération distincts, ce qui conditionne le choix de
+la méthode d'imputation.
+
+Les \textit{lacunes internes courtes} (1 à 3 mois consécutifs) résultent
+d'erreurs de calcul héritées des formules Excel sources ou de retards de
+remontée. Elles sont raisonnablement supposées \textit{Missing At Random}
+(MAR) : la probabilité d'une valeur manquante dépend de la période et de
+l'indicateur (observables), non de la valeur non observée elle-même.
+
+Les \textit{lacunes étendues internes} (plus de 3 mois consécutifs) résultent
+de défaillances de collecte prolongées. L'hypothèse MAR reste raisonnable si
+les indicateurs présentant des lacunes corrèlent avec d'autres indicateurs
+renseignés.
+
+Les \textit{lacunes structurelles en début ou fin de série} correspondent à
+des périodes antérieures au démarrage effectif de la collecte d'un indicateur,
+fréquentes en RCA et en Guinée équatoriale. Elles sont de nature
+\textit{Missing Not At Random} (MNAR) : l'absence de valeur est liée à
+l'indicateur lui-même et non à des facteurs observables. L'application de
+MICE sur des données MNAR introduit un biais d'imputation sévère et non
+contrôlé.
+
+\subsubsection{Stratégie d'imputation par type de lacune}
+
+\textit{Lacunes courtes (1 à 3 mois) :} interpolation temporelle linéaire.
+Elle préserve la continuité locale de la série sans introduire de biais
+structurel. Bezanson et al.\ (Nature Scientific Reports, 2026) confirment
+que sur les séries temporelles à lacunes isolées, l'interpolation linéaire
+``remained competitive across many settings'' comparativement aux méthodes
+plus complexes. Son avantage supplémentaire dans le contexte de détection
+d'anomalies est de ne pas exploiter les corrélations inter-séries pour
+reconstruire la valeur manquante  limitant ainsi le risque de lisser une
+anomalie réelle présente simultanément dans plusieurs indicateurs.
+
+\textit{Lacunes étendues (plus de 3 mois) :} algorithme MICE
+(\textit{Multivariate Imputation by Chained Equations}, Van Buuren \&
+Groothuis-Oudshoorn, 2011). MICE exploite les corrélations entre les 55
+indicateurs du bilan pour inférer les valeurs absentes par régression
+conditionnelle itérative sur chaque variable manquante. Cette approche est
+adaptée au dataset BEAC car les indicateurs IFS présentent des corrélations
+structurelles fortes (les sous-postes d'un agrégat covarient avec l'agrégat
+parent). La validité de MICE repose sur l'hypothèse MAR, raisonnable pour
+les lacunes étendues internes.
+
+Un risque critique doit être signalé : toute méthode d'imputation peut masquer
+des anomalies contenues dans les données manquantes. arXiv:2110.11780 documente
+que les méthodes de gap filling ``tend to decrease the accuracy of the detection
+results'' quand appliquées avant détection d'anomalies. Pour limiter ce risque,
+les scores LOF obtenus sur les périodes comportant des valeurs imputées sont
+signalés dans les résultats comme \textit{scores à fiabilité réduite}, distincts
+des scores sur données complètes.
+
+\textit{Lacunes structurelles MNAR :} troncature de la fenêtre temporelle
+d'analyse au premier mois effectivement renseigné pour la majorité des
+indicateurs. Les séries dont la part de valeurs imputées en début de période
+dépasse 20\,\% de la fenêtre totale sont exclues de la matrice d'entrée du
+LOF pour ce fichier.
+
+\subsection{Normalisation robuste par série}
+
+\subsubsection{Inadéquation du Z-score classique}
+
+Les 55 indicateurs étant exprimés en milliards de FCFA mais présentant des
+ordres de grandeur très hétérogènes, une normalisation individuelle par série
+est indispensable avant tout calcul de distance euclidienne dans l'espace
+multivarié. La standardisation classique $x^* = (x - \bar{x}) / \sigma$ est
+inadaptée pour deux raisons complémentaires.
+
+D'une part, la moyenne $\bar{x}$ et l'écart-type $\sigma$ sont très sensibles
+aux valeurs extrêmes : un outlier prononcé gonfle simultanément $\bar{x}$ et
+$\sigma$, réduisant mécaniquement sa propre valeur normalisée. L'anomalie
+devient moins détectable après la normalisation censée préparer sa détection.
+Leys et al.\ (2013) formalisent cette circularité sur données réelles et
+montrent que le Z-score peut masquer des anomalies que la standardisation
+robuste révèle.
+
+D'autre part, dans le contexte BEAC, plusieurs indicateurs présentent des
+ruptures structurelles documentées (choc COVID-19 2020--2021) qui constituent
+précisément des anomalies à détecter. Le Z-score calculé sur l'ensemble de
+la période 2001--2026 intégrerait ces ruptures dans l'estimation de $\sigma$,
+biaisant la normalisation dans le sens contraire à l'objectif de détection.
+
+\subsubsection{Standardisation retenue : médiane/MAD}
+
+Pour chaque série $i$, la transformation appliquée est :
+$$x_{i,t}^* = \frac{x_{i,t} - \tilde{x}_i}
+                    {\kappa \cdot \mathrm{MAD}(x_i)}$$
+
+où $\tilde{x}_i = \mathrm{median}_t(x_{i,t})$ est la médiane temporelle,
+$$\mathrm{MAD}(x_i) =
+\mathrm{median}_t\!\bigl(\,|x_{i,t} - \tilde{x}_i|\,\bigr)$$
+est la déviation absolue médiane, et
+$\kappa = 1/\Phi^{-1}(0{,}75) \approx 1{,}4826$ est le facteur de cohérence
+rendant le MAD asymptotiquement équivalent à $\sigma$ sous distribution
+gaussienne (Leys et al.\ 2013). La médiane possède un point de rupture de
+50\,\% contre 0\,\% pour la moyenne, et le MAD hérite de cette propriété :
+jusqu'à 50\,\% des observations peuvent être des anomalies sans biaiser
+l'estimation de la dispersion de référence.
+
+\subsection{Décomposition STL des séries temporelles}
+
+\subsubsection{Inadéquation du LOF sur séries brutes}
+
+Le LOF opère dans un espace géométrique statique : il évalue la densité locale
+d'un point en fonction de ses distances aux voisins dans l'espace des
+descripteurs, sans aucune modélisation de l'ordre temporel (lacune L1,
+section~5). En présence de tendances macroéconomiques prononcées  les
+crédits aux sociétés non financières ont progressé de près de 600\,\% en
+termes nominaux sur 2001--2026  la distance géométrique entre une
+observation de 2010 et une observation de 2024 intègre l'effet de la dérive
+temporelle, non l'anomalie conjoncturelle recherchée. De même, la saisonnalité
+budgétaire récurrente (pics de fin d'année liés aux décaissements de l'État)
+serait qualifiée d'anomalie par un LOF appliqué aux données brutes.
+
+\subsubsection{Décomposition STL vs alternatives}
+
+Trois méthodes de décomposition ont été évaluées pour isoler la composante
+résiduelle stationnaire.
+
+\textit{Différenciation première} : supprime les tendances stochastiques de
+type I(1) mais ne gère pas la saisonnalité. Inadaptée aux données BEAC dont
+la saisonnalité budgétaire est documentée et structurellement récurrente.
+
+\textit{X-13 ARIMA-SEATS} : méthode standard des banques centrales pour les
+statistiques officielles mensuelles/trimestrielles. Elle gère les effets
+calendaires, les ajustements trading-day et produit des statistiques M1--M11
+de qualité des résidus. Son inconvénient est qu'elle suppose une stationnarité
+préalable et qu'elle est moins robuste aux outliers dans les séries d'entrée
+ les anomalies recherchées peuvent biaiser l'estimation des composantes.
+Des recommandations techniques identifient X-13 comme adapté ``for monthly
+and quarterly official statistics'' (revue metricgate.com/blogs/stl-vs-x13),
+précisément le contexte BEAC.
+
+\textit{STL (Seasonal and Trend decomposition using Loess, Cleveland et al.\
+1990)} : décompose chaque série $x_{i,t}$ en trois composantes additives :
+$$x_{i,t} = T_{i,t} + S_{i,t} + R_{i,t}$$
+où $T_{i,t}$ est la tendance estimée par régression locale Loess, $S_{i,t}$
+la composante saisonnière mensuelle (période $= 12$), et $R_{i,t}$ le résidu.
+
+STL est retenu sur X-13 pour trois raisons spécifiques au contexte de
+détection d'anomalies dans un pipeline ML. Premièrement, STL est robuste
+aux outliers via un schéma de pondération interne (\textit{outer loop}) qui
+atténue l'influence des points atypiques sur l'estimation de la tendance 
+évitant que les anomalies recherchées biaisent leur propre extraction.
+Deuxièmement, sa composante saisonnière est \textit{time-varying}, adaptée
+aux données dont la saisonnalité budgétaire peut évoluer avec les réformes
+fiscales CEMAC. Troisièmement, STL s'intègre naturellement dans les pipelines
+ML non supervisés selon les recommandations de la revue technique comparative.
+
+Il est honnête de signaler qu'aucun benchmark quantitatif direct comparant
+STL et X-13 sur des métriques de détection d'anomalies (F1, AUC) n'est
+disponible dans la littérature publiée. Ce choix repose sur des arguments
+qualitatifs documentés et sur la pratique établie des pipelines ML de
+détection d'anomalies dans les séries temporelles. RobustSTL (AAAI 2019,
+arXiv:1812.01767) constitue une amélioration du STL standard pour les séries
+à saisonnalité variable et à bruit intense, mobilisable comme variante si
+les résidus STL standards présentent une autocorrélation résiduelle
+significative.
+
+Seul le résidu $R_{i,t}$ est retenu comme entrée du LOF. Ce résidu représente
+les fluctuations inexpliquées par la dynamique normale de la série et constitue
+le support naturel de la détection d'anomalies.
+
+\subsection{Réduction de la dimensionnalité par RPCA}
+
+\subsubsection{Le fléau de la dimensionnalité pour le LOF}
+
+Avec $D \approx 55$ indicateurs, l'espace résiduel dans lequel le LOF calcule
+ses distances est de dimension~55. Zimek, Schubert \& Kriegel (2012) identifient
+formellement huit problèmes distincts des méthodes à base de densité en haute
+dimension. Le mécanisme central est la concentration des distances : en haute
+dimension, les distances entre tous les points convergent vers la même valeur,
+rendant le concept de voisinage non discriminant. CFOF (arXiv:1901.04992) prouve
+formellement que kNN, aKNN et LOF ``concentrate according to Definition~3.5''
+en haute dimension : les scores convergent vers une valeur constante, rendant
+tout ranking impossible. Cette dégénérescence est une lacune structurelle du
+LOF documentée en section~5.2.
+
+Dans le contexte du dataset BEAC, ce problème est amplifié par la redondance
+structurelle entre indicateurs : de nombreuses séries sont des composantes ou
+des sous-totaux d'agrégats de niveau supérieur, induisant une forte
+collinéarité qui concentre la variance dans un sous-espace de faible dimension.
+Une réduction de dimension est donc indispensable avant le calcul du LOF, non
+seulement pour contourner la malédiction de la dimensionnalité, mais aussi
+pour éliminer la redondance informationnelle.
+
+\subsubsection{RPCA vs ACP classique}
+
+L'ACP classique est sensible aux outliers : ceux-ci exercent un effet de
+levier sur les vecteurs propres, tirant les axes principaux vers eux et
+biaisant la projection. Les anomalies se retrouvent alors projetées dans le
+sous-espace jugé normal, réduisant leur visibilité dans l'espace de calcul
+du LOF.
+
+La RPCA (\textit{Robust Principal Component Analysis}, Candès et al.\ 2011)
+contourne ce problème en décomposant la matrice $X \in \mathbb{R}^{n \times p}$
+en une composante de bas rang $L$ (structure normale) et une composante creuse
+$S$ (anomalies) :
+$$X = L + S$$
+par la minimisation convexe :
+$$\min_{L,\,S} \; \|L\|_* + \lambda\|S\|_1
+\quad \text{s.c.} \quad L + S = X$$
+où $\|\cdot\|_*$ est la norme nucléaire et $\|\cdot\|_1$ la norme
+\textit{entrywise} $\ell_1$, avec $\lambda = 1/\sqrt{\max(n,p)}$.
+
+ROBPCA (PcaHubert, 2010) démontre que les méthodes robustes de type RPCA
+``outperform several robust PCA tools'' et présentent ``the highest sensitivity''
+pour la détection d'outliers. Sur données de réseau, arXiv:1801.01571 montre
+que ``PCA analysis misses the vast majority of attack packets'' alors que RPCA
+les détecte, au prix de faux négatifs significatifs pour l'ACP classique.
+
+Seule la composante $L$ est ensuite projetée par ACP classique pour obtenir
+les $k$ premières composantes principales, $k$ étant déterminé par le critère
+du coude et validé par le pourcentage de variance expliquée cumulée (cible :
+90\,\%). Il est honnête de signaler qu'aucun benchmark direct RPCA+LOF vs
+ACP+LOF n'est disponible dans la littérature sur données financières ou
+macroéconomiques multivariées. La justification de RPCA sur ACP repose sur
+la décomposition $L + S$ qui isole mieux les anomalies ponctuelles 
+théoriquement justifiée (Candès et al.\ 2011) mais non quantifiée
+empiriquement sur SMD/MSL/SMAP pour ce prétraitement spécifique.
+
+arXiv:2603.18985 confirme que ``PCA models anomaly detection is limited to
+linear relationships'' et qu'OmniAnomaly dépasse systématiquement les
+approches PCA sur les benchmarks de référence, argument supplémentaire en
+faveur de RPCA comme prétraitement robuste avant LOF, même si RPCA+LOF
+reste structurellement inférieur aux méthodes profondes (lacune L2).
+
+UMAP (\textit{Uniform Manifold Approximation and Projection}) est réservé à
+la visualisation des scores LOF dans un espace bidimensionnel. Sa nature non
+déterministe et la distorsion qu'il introduit dans les distances globales le
+rendent inadapté comme espace de calcul du LOF dans un contexte opérationnel
+où la reproductibilité est exigée (contrainte C5).
+
+\subsection{Calcul du score LOF et formalisation du seuil}
+
+\subsubsection{Score LOF agrégé sur la plage de MinPts}
+
+Le pipeline produit, pour chaque mois $t$ de chaque fichier, un score agrégé :
+$$\mathrm{LOF}^*(t) = \max \bigl\{
+\mathrm{LOF}_{\mathrm{MinPts}}(t) \mid
+10 \leq \mathrm{MinPts} \leq 30
+\bigr\}$$
+
+Ce score représente l'anomalie maximale observée sur l'ensemble de la plage
+de voisinage, garantissant la robustesse aux fluctuations de MinPts
+documentées en section~3.6.
+
+\subsubsection{Seuil de détection par IQR}
+
+Le seuil de détection $\tau$ est ancré dans la distribution empirique des
+scores $\mathrm{LOF}^*$ via la règle de l'écart interquartile (Tukey, 1977) :
+$$\tau = Q_3\!\bigl(\mathrm{LOF}^*\bigr)
++ 1{,}5 \times \mathrm{IQR}\!\bigl(\mathrm{LOF}^*\bigr)$$
+où $Q_3$ est le troisième quartile et $\mathrm{IQR} = Q_3 - Q_1$.
+
+Ce seuil est préféré au percentile fixe 95 car sa sensibilité ne dépend pas
+de la proportion d'anomalies réelles dans le dataset  inconnue a priori
+dans le contexte non supervisé BEAC. En complément, le seuil au
+95\textsuperscript{e} percentile est calculé comme variante de sensibilité.
+Les observations dépassant les deux seuils simultanément constituent les
+\textit{anomalies robustes}~; celles signalées par un seul seuil constituent
+les \textit{anomalies marginales} requérant une expertise domaine.
+% ════════════════════════════════════════════════════════════════
+\section{Lacunes Structurelles du LOF}
+
+Cette section cartographie les cinq lacunes structurelles du LOF qui
+motivent la construction de BiVAT comme Modèle~2 de l'étude. Pour chaque
+lacune, le mécanisme formel est exposé, les données empiriques documentées
+sont présentées, et l'implication pour le contexte BEAC est explicitée.
+La section~8 montrera comment BiVAT apporte une réponse architecturale
+documentée à chacune de ces lacunes.
+
+\subsection{Lacune L1  Ignorance des dépendances temporelles}
+
+\subsubsection{Mécanisme formel}
+
+Le LOF traite chaque observation comme un vecteur indépendant dans l'espace
+des features. La définition du facteur d'anomalie local (section~3.4) ne fait
+intervenir aucune notion d'ordre temporel, d'autocorrélation ou de rupture de
+régime. Deux mois séparés par une décennie et présentant des résidus similaires
+reçoivent exactement le même score LOF, indépendamment de leur position dans
+le temps.
+
+Cette limitation a une conséquence directe sur les types d'anomalies
+détectables. Chandola, Banerjee \& Kumar (2009, ACM Computing Surveys, 41(3))
+formalisent la taxonomie fondamentale des anomalies en séries temporelles :
+les \textit{anomalies ponctuelles} (un seul instant $t$ aberrant dans l'espace
+des features) sont détectables par le LOF ; les \textit{anomalies contextuelles}
+(une valeur normale globalement mais anormale dans son contexte temporel
+immédiat) sont ignorées car le LOF ne connaît pas ce contexte ; les
+\textit{anomalies collectives} (une séquence d'observations normales
+individuellement mais anormale en tant que séquence) sont également ignorées.
+Or, dans le contexte de surveillance macroprudentielle BEAC, les anomalies
+les plus pertinentes sont précisément contextuelles et collectives : un choc
+de crédit en 2020 est anormal non parce que la valeur absolue des crédits est
+hors norme, mais parce que sa trajectoire s'écarte brutalement de la dynamique
+attendue.
+
+\subsubsection{Données empiriques}
+
+Le benchmark MEMTO (Xu et al.\ 2023, arXiv:2312.02530, Table~1) fournit la
+comparaison la plus complète disponible entre le LOF et les méthodes à
+modélisation temporelle sur les cinq datasets de référence.
+
+\begin{table}[ht]
+\centering
+\caption{LOF vs méthodes temporelles profondes  F1-score (\%).
+Source : Xu et al.\ 2022 (ICLR, Table~1) et MEMTO (arXiv:2312.02530,
+Table~1). Protocole point adjustment.}
+\label{tab:l1-benchmark}
+\small
+\begin{tabular}{lcccccr}
+\toprule
+\textbf{Méthode} & \textbf{SMD} & \textbf{MSL} & \textbf{SMAP} &
+\textbf{SWaT} & \textbf{PSM} & \textbf{Moyenne} \\
+\midrule
+LOF & 46.68 & 61.18 & 57.60 & 68.62 & 70.61 & 60.94 \\
+OmniAnomaly (LSTM-VAE) & 85.22 & 87.67 & 86.92 & 82.83 & 80.83 & 84.69 \\
+Anomaly Transformer & 92.33 & 93.59 & 96.69 & 94.07 & 97.89 & 94.91 \\
+\midrule
+\textbf{Écart LOF vs AT} &
+$-$45.65 & $-$32.41 & $-$39.09 & $-$25.45 & $-$27.28 &
+\textbf{$-$33.98} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+L'écart moyen entre le LOF et l'Anomaly Transformer est de $-33{,}98$ points
+de F1. Ce n'est pas un écart de réglage fin  c'est un écart de nature :
+les méthodes temporelles détectent des anomalies que le LOF rate
+structurellement parce qu'elles modélisent les dépendances séquentielles.
+arXiv:2208.09240 confirme ce mécanisme : les méthodes non-temporelles
+``perform the worst because they are poor at capturing temporal information.''
+DAGMM (modèle génératif sans dépendance temporelle explicite) obtient
+F1 = 57.30 sur SMD, très proche du LOF (46.68), confirmant que l'absence
+de modélisation temporelle est le facteur limitant commun.
+
+\subsubsection{Implication pour le contexte BEAC}
+
+Sur les données BEAC, les anomalies les plus économiquement significatives
+sont de nature contextuelle et collective : le choc COVID-19 n'est pas un
+outlier ponctuel dans l'espace des 55 indicateurs, mais une rupture de
+trajectoire sur plusieurs mois consécutifs. Le LOF appliqué aux résidus STL
+peut détecter des déviations ponctuelles importantes (erreurs de saisie,
+chocs exogènes brutaux) mais sous-détectera systématiquement les dérives
+progressives et les anomalies collectives de type choc macroéconomique étendu.
+
+\subsection{Lacune L2  Dégénérescence en haute dimension}
+
+\subsubsection{Mécanisme formel}
+
+Zimek, Schubert \& Kriegel (2012) identifient le phénomène de concentration
+des distances comme le problème central des méthodes à base de densité en
+haute dimension : lorsque $D$ croît, la distribution des distances entre
+tous les points converge vers une valeur constante, rendant le classement
+par proximité non discriminant. CFOF (arXiv:1901.04992) prouve formellement
+que kNN, aKNN et LOF ``concentrate according to Definition~3.5'' en haute
+dimension  les scores LOF convergent vers une valeur constante, rendant
+tout ranking d'anomalies impossible. Cette concentration est une propriété
+théorique universelle des méthodes à base de distance euclidienne en espace
+de grande dimension.
+
+\subsubsection{Données empiriques}
+
+Sur données financières multivariées réelles (arXiv:2209.11686, Table~23--24),
+le LOF obtient F1 = 33.33\% contre 56.35\% pour PCA + réseau de neurones,
+illustrant que même après réduction de dimension, la chaîne LOF reste inférieure
+aux méthodes exploitant des représentations non-linéaires. arXiv:2603.18985
+confirme que ``PCA models anomaly detection is limited to linear relationships''
+et qu'OmniAnomaly dépasse systématiquement les approches PCA sur les benchmarks
+de référence. La réduction RPCA atténue le problème mais ne le résout pas :
+la projection dans un sous-espace linéaire de bas rang ne capture pas les
+structures non-linéaires des anomalies financières complexes.
+
+\subsubsection{Implication pour le contexte BEAC}
+
+Avec $D = 55$ indicateurs, le dataset BEAC se situe au-delà du seuil de
+dégénérescence documenté par Zimek et al.\ (2012) pour les méthodes à densité
+locale ($D \approx 20$). La réduction RPCA ramène la dimension effective
+à $k < 20$ composantes (cible de 90\,\% de variance expliquée), atténuant
+partiellement ce problème. Mais les relations non-linéaires entre indicateurs
+IFS  notamment les interactions entre crédits, dépôts et liquidité dans
+les phases de stress bancaire  ne sont pas capturées par une projection
+linéaire, quelle qu'elle soit.
+
+\subsection{Lacune L3  Absence de quantification d'incertitude}
+
+\subsubsection{Mécanisme formel}
+
+Le LOF produit un score scalaire déterministe dans $[0, +\infty)$ sans
+intervalle de confiance ni probabilité associée. Ce score n'est pas
+directement interprétable comme probabilité d'anomalie : deux mois recevant
+des scores de 1.8 et 2.1 peuvent être également anormaux ou très différemment
+anormaux selon la distribution empirique des scores sur le dataset, sans que
+le score lui-même permette de le déterminer.
+
+\subsubsection{Données empiriques et variante LoOP}
+
+La variante LoOP (Kriegel et al.\ 2009) transforme les scores LOF en
+probabilités dans $[0,1]$ via la fonction d'erreur gaussienne appliquée
+au ratio PLOF/nPLOF. Son avantage est l'interprétabilité directe du score,
+mais elle suppose une distribution half-gaussienne des distances  hypothèse
+non vérifiable sur données financières à régimes multiples. De plus, LoOP
+hérite de la même sensibilité à MinPts que le LOF standard. BIS FSI Paper
+(2024) souligne que ``the lack of explainability of certain AI models can make
+it challenging for regulators to ascertain financial institutions' compliance''
+ un score sans incertitude rend également impossible le contrôle du taux
+de fausse alarme, exigence fondamentale de la surveillance prudentielle.
+
+\subsubsection{Implication pour le contexte BEAC}
+
+Un superviseur prudentiel BEAC a besoin non seulement d'un score scalaire
+indiquant qu'une observation est anormale, mais d'une mesure de la certitude
+de cette décision pour calibrer la priorité des investigations. Un score LOF
+de 2.5 en avril 2020 ne dit pas si cette anomalie est certaine (haute confiance)
+ou marginale (à surveiller). La Conformal Prediction post-hoc, appliquée dans
+BiVAT, apporte cette garantie formelle $\Pr(\hat{y} \in C_\alpha) \geq 1 -
+\alpha$ que le LOF standard ne peut pas fournir sans post-traitement.
+
+\subsection{Lacune L4  Absence d'explicabilité par indicateur}
+
+\subsubsection{Mécanisme formel}
+
+Le LOF produit un score global par observation. Il ne décompose pas la
+contribution de chaque indicateur IFS à l'anomalie détectée. Pour un mois
+$t$ recevant un score $\mathrm{LOF}^*(t) = 3.2$, il est impossible de
+déterminer si cette anomalie est portée principalement par les crédits aux
+entreprises, par les dépôts transférables, ou par une combinaison de plusieurs
+indicateurs  sans recourir à un post-traitement externe au modèle lui-même.
+
+\subsubsection{Extensions documentées et leurs limites}
+
+Les extensions du LOF proposant une explicabilité par feature sont rares et
+insuffisantes. La méthode Feature Bagging (Lazarevic \& Kumar, 2005, KDD)
+agrège des scores LOF calculés sur des sous-espaces aléatoires de features,
+permettant d'identifier les sous-espaces les plus discriminants. Cependant,
+elle ne fournit pas une attribution quantitative par feature individuelle
+directement interprétable. L'INFLO (Jin et al.\ 2006) et le LDOF (Zhang et al.\
+2009) améliorent la stabilité et la robustesse du LOF mais n'ajoutent pas de
+décomposition par indicateur. La seule solution d'explicabilité feature-level
+applicable au LOF est SHAP post-hoc appliqué non pas au modèle lui-même
+(le LOF n'est pas différentiable) mais aux features d'entrée  approche
+approximative qui ne satisfait pas les exigences d'auditabilité de SHAPAttenVAE
+(Zhang et al.\ 2025) où l'explicabilité est intégrée à l'architecture.
+
+\subsubsection{Implication réglementaire pour le contexte BEAC}
+
+L'ECB Guide to Internal Models (2025, ML chapter) et le BIS FSI Paper (2024)
+exigent une attribution causale par feature reproductible et auditable pour
+les modèles de surveillance prudentielle. SHAP est la seule méthode
+explicitement citée dans les processus ICAAP/CCAR à ce titre (SHARC,
+arXiv:2607.05484). Dans le contexte BEAC/COBAC, l'impossibilité de produire
+une explication du type ``l'anomalie d'avril 2020 est attribuée à 67\% à la
+série Crédits\_ENF et 22\% à Dépôts\_transf'' constitue une limitation
+opérationnelle majeure du LOF qui empêche son déploiement comme outil de
+surveillance autonome sans expertise humaine complémentaire.
+
+\subsection{Lacune L5  Instabilité des scores selon MinPts}
+
+\subsubsection{Mécanisme formel}
+
+Breunig et al.\ (2000, Section~6.1) démontrent dès le papier original la
+non-monotonicité du score LOF en fonction de MinPts : pour un même point,
+augmenter MinPts peut alternativement augmenter, diminuer ou stabiliser son
+LOF selon la structure locale du voisinage. Il n'existe pas de valeur
+universellement optimale de MinPts, et le score d'un point peut changer
+radicalement selon le voisinage considéré.
+
+\subsubsection{Données empiriques}
+
+Goldstein \& Uchida (2016, PLoS ONE, 11(4): e0152173) conduisent un benchmark
+systématique de 19 algorithmes de détection d'anomalies sur données
+multivariées avec variation des hyperparamètres. Leur conclusion est que le
+LOF est parmi les algorithmes les plus sensibles aux hyperparamètres sur les
+datasets à densité variable. En comparaison, Liu et al.\ (2008, ICDM) montrent
+que l'Isolation Forest ``converges very quickly at small $\psi$'' et que
+``AUC is near optimal when $\psi = 128$''  l'IF converge avec peu d'arbres
+et est stable dans une large plage de paramètres, avantage documenté sur le LOF.
+
+\subsubsection{Implication pour le contexte BEAC}
+
+L'instabilité des scores LOF selon MinPts est partiellement atténuée par la
+stratégie de la plage de valeurs (section~3.6), qui calcule le maximum sur
+$\mathrm{MinPts} \in [10, 30]$. Cette stratégie réduit la sensibilité mais
+ne l'élimine pas : le score $\mathrm{LOF}^*(t)$ dépend toujours des bornes
+de la plage retenue. Dans un contexte de surveillance institutionnelle où la
+reproductibilité est exigée (contrainte C5), cette dépendance au choix de la
+plage doit être documentée explicitement et justifiée dans tout rapport de
+résultats.
+
+% ════════════════════════════════════════════════════════════════
+\section{Protocole de Validation}
+
+\subsection{Contexte non supervisé}
+
+La détection d'anomalies dans le dataset BEAC est intrinsèquement non
+supervisée : il n'existe pas de labels historiques certifiés. Breunig et al.\
+(2000, Section~7) soulignent cette dimension exploratoire du LOF : il s'agit
+d'un outil de scoring ordinal dont la valeur réside dans le classement relatif
+des observations. L'évaluation des détections repose donc sur cinq niveaux
+complémentaires de validation externe.
+
+\subsection{Protocole en cinq niveaux}
+
+\textbf{Niveau 1  Analyse de sensibilité des scores LOF.}
+Le profil $\mathrm{LOF}_{\mathrm{MinPts}}(t)$ est tracé pour
+$\mathrm{MinPts} \in [10, 30]$, reproduisant la démarche de la Figure~8
+de Breunig et al.\ (2000) sur les données BEAC. Les mois maintenant un LOF
+élevé sur toute la plage sont des anomalies robustes au sens de la
+section~4.6. Les mois anomaux seulement pour certaines valeurs de MinPts
+sont signalés comme anomalies sensibles requérant une expertise domaine.
+
+\textbf{Niveau 2  Confrontation aux ruptures macroéconomiques documentées.}
+Les anomalies détectées ($\mathrm{LOF}^* > \tau$) sont confrontées aux
+événements documentés dans la zone CEMAC : choc pétrolier 2014--2016, crise
+sécuritaire camerounaise à partir de 2017, choc COVID-19 2020--2021, dynamiques
+post-pandémiques 2022--2024. Une concordance entre les anomalies détectées et
+ces épisodes constitue une validation externe qualitative. Cette approche est
+cohérente avec la méthode utilisée par BIS Bulletin~84 (2024), qui valide les
+détections d'autoencoders sur systèmes de paiement par concordance avec
+``real-life anomalies including operational disruptions among important domestic
+banks''.
+
+\textbf{Niveau 3  Comparaison avec une baseline de distance globale.}
+Le LOF est comparé à la distance de Mahalanobis multivariée appliquée aux
+mêmes résidus STL normalisés, après vérification de la stabilité numérique
+de l'estimation de la matrice de covariance. Ce niveau met en évidence les
+anomalies locales que le LOF détecte et que la méthode globale manque 
+notamment les déviations atypiques dans des régimes à densité variable
+(post-2020 vs pré-2015). La métrique de comparaison est la concordance entre
+les top-20 anomalies classées par chaque méthode.
+
+\textbf{Niveau 4  Validation croisée inter-pays.}
+Les douze jeux de scores $\mathrm{LOF}^*$ sont superposés sur l'axe temporel.
+Un mois $t$ est qualifié d'\textbf{anomalie systémique CEMAC} s'il dépasse
+$\tau$ dans au moins $m \geq 3$ pays simultanément. Les anomalies systémiques
+devraient coïncider avec les chocs documentés (crise pétrolière, COVID-19).
+Une anomalie détectée dans un seul pays sur une période non documentée est
+plus vraisemblablement liée à un problème de collecte local qu'à un événement
+économique réel.
+
+\textbf{Niveau 5  Cohérence Actif--Passif.}
+Les scores $\mathrm{LOF}^*$ des fichiers Actif et Passif sont comparés mois
+par mois pour chaque pays. Les anomalies concordantes sur les deux volets
+sont interprétées comme des événements économiques réels~; les anomalies
+discordantes sont signalées comme suspectes et soumises à vérification
+comptable.
+
+% ════════════════════════════════════════════════════════════════
+\section{Positionnement Institutionnel du LOF}
+
+Cette section documente la légitimité du LOF comme baseline de référence
+dans le contexte de surveillance bancaire et financière institutionnelle,
+en s'appuyant sur cinq publications directement pertinentes.
+
+\textbf{BIS IFC Bulletin~66 (2024).} Ce bulletin cite explicitement le LOF
+(``LOF: Identifying Density-Based Local Outliers'', Breunig et al.\ 2000)
+comme méthode de référence dans le contexte de détection d'anomalies dans les
+données bancaires, aux côtés de l'Isolation Forest et d'ECOD.
+\url{https://www.bis.org/ifc/publ/ifcb66\_08.pdf}
+
+\textbf{Bank of Italy Occasional Paper~689 (2022).} Maddaloni et al.\ (SSRN:
+4109500) appliquent des algorithmes ML incluant des méthodes de la famille LOF
+pour détecter des anomalies dans les données de reporting bancaire granulaires
+(AnaCredit vs BSI vs FinRep). Le papier rapporte que ``performance of the
+stacking technique, in terms of F1-score, is higher than in each algorithm
+alone'', validant l'approche comparative multi-méthodes adoptée dans ce travail.
+
+\textbf{BCE / ECB DG Statistics (2021).} Accornero \& Boscariol (BIS IFC
+Bulletin~57, Section~5) appliquent des méthodes ML à la détection d'anomalies
+dans les données de reporting bancaire à la BCE, dans un cadre non supervisé
+comparable au contexte BEAC.
+\url{https://www.bis.org/ifc/publ/ifcb57\_05.pdf}
+
+\textbf{Banco de Portugal (2021).} Costa, Fonseca \& Maurício (BIS IFC
+Bulletin~57, Section~29) appliquent des méthodes de détection d'anomalies
+au registre de crédit portugais et documentent explicitement que ``more
+traditional outlier detection methods will (in general) perform poorly,
+especially from the computational point of view'' au-delà d'une certaine
+complexité des données. Cette citation fournit la justification institutionnelle
+du passage vers des méthodes plus sophistiquées comme BiVAT.
+\url{https://www.bis.org/ifc/publ/ifcb57\_29.pdf}
+
+\textbf{BIS IFC Bulletin~57 (2022).} Ce bulletin recense les applications ML
+dans les banques centrales et décrit l'utilisation opérationnelle de méthodes
+à densité (Affinity Propagation + DBSCAN) pour la détection d'anomalies dans
+les données reportées par les institutions financières  même famille
+algorithmique que le LOF.
+\url{https://www.bis.org/ifc/publ/ifcb57\_01\_rh.pdf}
+
+% ════════════════════════════════════════════════════════════════
+\section{Comparaison LOF vs BiVAT}
+
+\subsection{Tableau comparatif structurel}
+
+Le tableau~\ref{tab:lof-bivat} présente la comparaison structurelle entre
+le LOF (Modèle~1) et BiVAT (Modèle~2) sur les cinq lacunes identifiées en
+section~5. Pour chaque lacune, la colonne BiVAT indique la réponse
+architecturale apportée et sa justification empirique documentée dans le
+document d'état de l'art BiVAT.
+
+\begin{longtable}{p{3cm}p{5.5cm}p{6cm}}
+\caption{Comparaison structurelle LOF vs BiVAT sur les cinq lacunes.}
+\label{tab:lof-bivat}\\
+\toprule
+\textbf{Lacune} & \textbf{LOF (Modèle 1)} & \textbf{BiVAT (Modèle 2)} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Lacune} & \textbf{LOF (Modèle 1)} & \textbf{BiVAT (Modèle 2)} \\
+\midrule
+\endhead
+\bottomrule\endlastfoot
+
+L1  Dépendances temporelles &
+Aucune modélisation temporelle. Anomalies contextuelles et collectives
+non détectables. Écart moyen $-33{,}98$ pts F1 vs Anomaly Transformer
+(Xu et al.\ 2022). &
+Encodeur hybride Transformer bidirectionnel + BiLSTM. Modélisation des
+dépendances longue portée et locales. Score collectif sur fenêtre glissante.
+F1 moyen $\geq 94$\% sur benchmarks de référence. \\
+\midrule
+
+L2  Haute dimension &
+Dégénérescence documentée au-delà de $D \approx 20$ (Zimek et al.\ 2012).
+RPCA atténue mais ne résout pas le problème (relations non-linéaires
+non capturées). &
+Espace latent VAE capturant les relations non-linéaires entre les 55
+indicateurs. Encoder contextuel bidirectionnel dans l'espace latent.
+Supérieur aux approches PCA+méthode classique (arXiv:2603.18985). \\
+\midrule
+
+L3  Incertitude &
+Score déterministe sans intervalle de confiance. LoOP exclu (hypothèse
+half-gaussienne invérifiable, sensibilité MinPts identique). &
+Conformal Prediction post-hoc : garantie formelle
+$\Pr(\hat{y} \in C_\alpha) \geq 1-\alpha$. SSBC pour petit calibration set
+($N=195$). CP pondérée pour non-stationnarité. \\
+\midrule
+
+L4  Explicabilité &
+Score global sans décomposition par indicateur IFS. Feature Bagging
+insuffisant. SHAP post-hoc approximatif (LOF non différentiable). &
+SHAP DeepSHAP inter-couches intégré à l'architecture. Perte de cohérence
+$\mathcal{L}_{\mathrm{expl}}$. Attribution par indicateur IFS directement
+exploitable. Stabilité SHAP = 1.00 (arXiv:2012.04218). \\
+\midrule
+
+L5  Stabilité paramétrique &
+Non-monotonicité documentée (Breunig et al.\ 2000). Parmi les algorithmes
+les plus sensibles aux hyperparamètres (Goldstein \& Uchida, 2016). Stratégie
+de plage atténue sans éliminer. &
+Hyperparamètres appris par optimisation end-to-end. KL annealing pour
+stabiliser l'entraînement variationnel. Association Discrepancy : $+18{,}82$
+pts F1 sans surcoût computationnel (ablation Xu et al.\ 2022, Table~3). \\
+\end{longtable}
+
+\subsection{Protocole de comparaison empirique sans labels}
+
+En l'absence de labels ground truth, la comparaison empirique entre LOF et
+BiVAT sur les données BEAC repose sur quatre métriques d'évaluation non
+supervisée complémentaires.
+
+\textbf{Métrique M1  Precision@k sur événements documentés.}
+Pour les $k$ mois recevant les scores les plus élevés (LOF$^*$ ou score BiVAT),
+on calcule la proportion correspondant à des événements macroéconomiques
+documentés dans la zone CEMAC (liste de référence : choc pétrolier
+2014--2016, crise camerounaise 2017--2019, COVID-19 mars--décembre 2020,
+rebond 2022). Cette métrique opérationnalise la validation par concordance
+utilisée par BIS Bulletin~84 (2024) et BIS IFC Bulletin~66 (2024). Une
+Precision@k plus élevée indique que le modèle classe les mois économiquement
+documentés plus haut dans son ranking d'anomalies.
+
+\textbf{Métrique M2  Rang moyen des anomalies connues.}
+Pour chaque événement documenté (COVID-19 mars 2020, nadir de la crise
+pétrolière décembre 2015, pic de la crise de liquidité 2016), on relève le
+percentile du score d'anomalie à cette date dans la distribution empirique
+des scores sur la période complète. Un rang au 95\textsuperscript{e} percentile
+ou supérieur valide que le modèle détecte l'événement comme anomalie robuste.
+
+\textbf{Métrique M3  Cohérence inter-modèles sur les top-k alertes.}
+Le taux de concordance entre les top-20 alertes LOF et les top-20 alertes
+BiVAT est calculé pour chaque fichier pays/volet. Une concordance élevée
+($\geq 70\,\%$) indique que les deux modèles s'accordent sur les anomalies
+les plus sévères et renforce la robustesse des détections. Une faible
+concordance indique que les deux modèles détectent des types d'anomalies
+différents (ponctuelles pour LOF, contextuelles/collectives pour BiVAT),
+information utile pour la surveillance.
+
+\textbf{Métrique M4  Concordance inter-pays sur anomalies systémiques.}
+Pour les anomalies classées systémiques CEMAC (section~6, Niveau~4), on
+compare le taux de concordance entre LOF et BiVAT. Les anomalies systémiques
+confirmées par les deux modèles constituent les alertes de niveau 1 (à
+signaler immédiatement)~; celles détectées par un seul modèle constituent
+les alertes de niveau 2 (à analyser).
+
+\subsection{Métriques communes et présentation des résultats}
+
+Les deux modèles produisent leurs résultats dans un format standardisé commun
+permettant la comparaison directe. Pour chaque fichier pays/volet et chaque
+mois $t$, les résultats incluent le score d'anomalie normalisé (LOF$^*$
+ou score BiVAT discriminant), le niveau de confiance associé (IQR-rule pour
+LOF, intervalle CP pour BiVAT), la classification de l'anomalie (robuste,
+marginale, normale), et l'indication de concordance inter-modèles. Un tableau
+récapitulatif ordonne les $N$ périodes les plus anomales par score décroissant,
+avec la mention des événements documentés concordants et de l'accord
+inter-modèles pour chaque alerte.
+
+% ════════════════════════════════════════════════════════════════
+\section{Conclusion}
+
+\subsection{Bilan du document}
+
+Ce document a établi la méthodologie complète du Modèle~1 de l'étude
+comparative, en trois contributions structurées.
+
+La première contribution est la justification empirique du choix du LOF parmi
+huit méthodes concurrentes. Le LOF est retenu comme meilleur compromis pour
+le contexte BEAC ($N = 195$, $D = 55$, données financières à densité variable)
+sur la base de sa supériorité empirique sur l'Isolation Forest sur données
+financières de petit volume (F1 = 33.33\% vs 17.82\%, arXiv:2209.11686), de
+son adéquation structurelle aux données multi-régimes, et de sa légitimité
+documentée dans cinq publications institutionnelles BIS/BCE/Banca d'Italia.
+
+La deuxième contribution est la documentation des cinq lacunes structurelles
+du LOF avec leurs données empiriques et leurs implications pour le contexte
+BEAC. L'écart moyen de $-33{,}98$ points de F1 entre le LOF et l'Anomaly
+Transformer (Xu et al.\ 2022) quantifie le potentiel de gain de BiVAT sur
+la lacune temporelle seule. Les quatre lacunes restantes (dimension, incertitude,
+explicabilité, instabilité) définissent précisément les axes de contribution
+de BiVAT documentés dans le document d'état de l'art.
+
+La troisième contribution est le protocole de comparaison inter-modèles sans
+labels ground truth, fondé sur quatre métriques d'évaluation non supervisée
+(Precision@k, rang des anomalies connues, cohérence inter-modèles,
+concordance systémique) adaptées au contexte de surveillance
+macroprudentielle BEAC-CEMAC.
+
+\subsection{Transition vers BiVAT}
+
+Le Banco de Portugal (Costa et al.\ 2021) documente que les méthodes
+traditionnelles comme le LOF ``will (in general) perform poorly'' au-delà
+d'une certaine complexité des données de surveillance bancaire. Cette
+observation institutionnelle, combinée aux cinq lacunes documentées en
+section~5, constitue la motivation précise de BiVAT comme Modèle~2 : non
+pas un remplacement arbitraire du LOF par une méthode plus complexe, mais
+une réponse architecturale documentée, lacune par lacune, aux limites
+structurelles d'un algorithme classique légitime dans son domaine de
+compétence et clairement insuffisant au-delà.
+
+% ════════════════════════════════════════════════════════════════
+\section*{Bibliographie}
+\addcontentsline{toc}{section}{Bibliographie}
+
+\begin{enumerate}
+
+\item Breunig, M.M., Kriegel, H.-P., Ng, R.T., \& Sander, J. (2000).
+LOF: Identifying Density-Based Local Outliers. \textit{Proceedings of the
+2000 ACM SIGMOD International Conference on Management of Data},
+pp.~93--104. DOI:~10.1145/342009.335388.
+
+\item Xu, J., Wu, H., Wang, J., \& Long, M. (2022). Anomaly Transformer:
+Time Series Anomaly Detection with Association Discrepancy. \textit{ICLR
+2022 (Spotlight)}.
+\url{https://ise.thss.tsinghua.edu.cn/~mlong/doc/anomaly-transformer-iclr22.pdf}
+
+\item Xu, Y. et al. (2023). MEMTO: Memory-guided Transformer for Multivariate
+Time Series Anomaly Detection. arXiv:2312.02530.
+
+\item Chandola, V., Banerjee, A., \& Kumar, V. (2009). Anomaly Detection:
+A Survey. \textit{ACM Computing Surveys}, 41(3), Article~15.
+DOI:~10.1145/1541880.1541882.
+
+\item Zimek, A., Schubert, E., \& Kriegel, H.-P. (2012). A survey on
+unsupervised outlier detection in high-dimensional numerical data.
+\textit{Statistical Analysis and Data Mining}, 5(5), 363--387.
+DOI:~10.1002/sam.11161.
+
+\item Liu, F.T., Ting, K.M., \& Zhou, Z.-H. (2008). Isolation Forest.
+\textit{Proceedings of the 8th IEEE International Conference on Data Mining
+(ICDM)}, pp.~413--422.
+
+\item Goldstein, M., \& Uchida, S. (2016). A Comparative Evaluation of
+Unsupervised Anomaly Detection Algorithms for Multivariate Data. \textit{PLoS
+ONE}, 11(4): e0152173. DOI:~10.1371/journal.pone.0152173.
+
+\item Candès, E.J., Li, X., Ma, Y., \& Wright, J. (2011). Robust Principal
+Component Analysis? \textit{Journal of the ACM}, 58(3), Article~11.
+DOI:~10.1145/1970392.1970395.
+
+\item Cleveland, R.B., Cleveland, W.S., McRae, J.E., \& Terpenning, I. (1990).
+STL: A Seasonal-Trend Decomposition Procedure Based on Loess.
+\textit{Journal of Official Statistics}, 6(1), 3--73.
+
+\item Van Buuren, S., \& Groothuis-Oudshoorn, K. (2011). mice: Multivariate
+Imputation by Chained Equations in R. \textit{Journal of Statistical Software},
+45(3), 1--67. DOI:~10.18637/jss.v045.i03.
+
+\item Leys, C., Ley, C., Klein, O., Bernard, P., \& Licata, L. (2013).
+Detecting outliers: Do not use standard deviation around the mean, use absolute
+deviation around the median. \textit{Journal of Experimental Social Psychology},
+49(4), 764--766. DOI:~10.1016/j.jesp.2013.03.013.
+
+\item Kriegel, H.-P., Kröger, P., Schubert, E., \& Zimek, A. (2009). LoOP:
+Local Outlier Probabilities. \textit{Proceedings of CIKM 2009}, pp.~1649--1652.
+DOI:~10.1145/1645953.1646195.
+
+\item Kriegel, H.-P., Kröger, P., Schubert, E., \& Zimek, A. (2011).
+Interpreting and Unifying Outlier Scores. \textit{Proceedings of SDM 2011},
+pp.~13--24. DOI:~10.1137/1.9781611972818.2.
+
+\item Tukey, J.W. (1977). \textit{Exploratory Data Analysis}.
+Addison-Wesley, Reading (MA).
+
+\item Schölkopf, B., Platt, J.C., Shawe-Taylor, J., Smola, A.J., \&
+Williamson, R.C. (2001). Estimating the Support of a High-Dimensional
+Distribution. \textit{Neural Computation}, 13(7), 1443--1471.
+
+\item Tang, J., Chen, Z., Fu, A.W.-C., \& Cheung, D.W. (2002). Enhancing
+Effectiveness of Outlier Detections for Low Density Patterns. \textit{PAKDD
+2002}, pp.~535--548.
+
+\item Papadimitriou, S., Kitagawa, H., Gibbons, P.B., \& Faloutsos, C. (2003).
+LOCI: Fast Outlier Detection Using the Local Correlation Integral.
+\textit{Proceedings of ICDE 2003}, pp.~315--326.
+
+\item Jin, W., Tung, A.K.H., Han, J., \& Wang, W. (2006). Ranking Outliers
+Using Symmetric Neighborhood Relationship. \textit{PAKDD 2006}, pp.~577--593.
+
+\item Zhang, K., Hutter, M., \& Jin, H. (2009). A New Local Distance-Based
+Outlier Detection Approach for Scattered Real-World Data. \textit{PAKDD 2009},
+pp.~813--822.
+
+\item Lazarevic, A., \& Kumar, V. (2005). Feature Bagging for Outlier
+Detection. \textit{Proceedings of the 11th ACM SIGKDD}, pp.~157--166.
+
+\item He, X. et al. (2024). VAEAT: Variational AutoEncoder with Adversarial
+Training. \textit{Information Sciences}, 676, 120852.
+
+\item Su, Y. et al. (2019). Robust Anomaly Detection for Multivariate Time
+Series through Stochastic Recurrent Neural Network. \textit{ACM SIGKDD},
+pp.~2828--2837.
+
+\item Bezanson, S. et al. (2026). Comparative imputation methods for
+clinical time series. \textit{Nature Scientific Reports}.
+DOI:~10.1038/s41598-026-39035-z.
+
+\item BIS / IFC (2024). A scalable, explainable machine learning approach
+for anomaly detection in banking data. \textit{IFC Bulletin~66}.
+\url{https://www.bis.org/ifc/publ/ifcb66\_08.pdf}
+
+\item Maddaloni, A. et al. (2022). Anomaly Detection in Banking Supervisory
+Data. Bank of Italy Occasional Paper~689. SSRN:~4109500.
+
+\item Accornero, G., \& Boscariol, F. (2021). Machine learning for anomaly
+detection in datasets with categorical variables. \textit{BIS IFC Bulletin~57},
+Section~5.
+\url{https://www.bis.org/ifc/publ/ifcb57\_05.pdf}
+
+\item Costa, A., Fonseca, J., \& Maurício, A. (2021). Novel methodologies for
+data quality management: Anomaly detection in the Portuguese Central Credit
+Register. \textit{BIS IFC Bulletin~57}, Section~29.
+\url{https://www.bis.org/ifc/publ/ifcb57\_29.pdf}
+
+\item BIS / IFC (2022). Machine learning applications in central banking.
+\textit{IFC Bulletin~57}.
+\url{https://www.bis.org/ifc/publ/ifcb57\_01\_rh.pdf}
+
+\item BIS (2024). Finding a needle in a haystack: a ML framework for anomaly
+detection in payment systems. \textit{BIS Bulletin~84}.
+\url{https://www.bis.org/publ/bisbull84.pdf}
+
+\item BIS / FSI (2024). How regulators can address AI explainability.
+\url{https://www.bis.org/fsi/fsipapers24.pdf}
+
+\item ECB (2025). Guide to Internal Models (ML chapter).
+\url{https://www.bankingsupervision.europa.eu}
+
+\item Moukoko Ekambi, G.M. (2025). Détection de Variations Atypiques dans
+les Séries Temporelles Financières par Architectures Hybrides VAE-Transformer :
+État de l'art outillé et justification architecturale de BiVAT. Rapport de
+stage, BEAC / ENSPD / Université de Douala, LIDIA Laboratory.
+
+\end{enumerate}
+
+\vspace{2cm}
+\hrule
+\vspace{0.5cm}
+\noindent{\small\textit{Document rédigé dans le cadre du stage de recherche
+à la Banque des États de l'Afrique Centrale (BEAC), M2 Data Science \& IA,
+ENSPD / Université de Douala  LIDIA Laboratory. Août 2026.}}
+
+\end{document}

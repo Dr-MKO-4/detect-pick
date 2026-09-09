@@ -1,0 +1,30 @@
+# Environnement virtuel
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Cache applicatif (figures régénérables)
+cache/
+
+# Logs
+logs/*.log
+
+# Base de données locale (données runtime, pas du code)
+beac.db
+beac.db-shm
+beac.db-wal
+
+# Build / packaging
+build/
+dist/
+*.spec.bak
+
+# Éditeurs / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

@@ -1,0 +1,1929 @@
+\documentclass[12pt,a4paper]{article}
+
+% ── Encodage et langue ──────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+
+% ── Mise en page ─────────────────────────────────────────────────
+\usepackage[top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% ── Mathématiques ────────────────────────────────────────────────
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{mathtools}
+\usepackage{bm}
+
+% ── Tableaux ─────────────────────────────────────────────────────
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{rotating}
+\usepackage{pdflscape}
+
+% ── Typographie ──────────────────────────────────────────────────
+\usepackage{microtype}
+\usepackage{lmodern}
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+% ── Liens ────────────────────────────────────────────────────────
+\usepackage[colorlinks=true, linkcolor=black, citecolor=black,
+            urlcolor=black]{hyperref}
+
+% ── En-tête / pied de page ───────────────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{BiVAT  État de l'art \& Justification architecturale}}
+\fancyhead[R]{\small\textit{MOUKOKO EKAMBI G.M.}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ── Sections ─────────────────────────────────────────────────────
+\usepackage{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\itshape}{\thesubsubsection}{0.5em}{}
+
+% ── Commandes utilitaires ────────────────────────────────────────
+\newcommand{\nd}{--}
+
+% ── Environnement encart neutre ──────────────────────────────────
+\usepackage{mdframed}
+\newmdenv[
+  linewidth=0.4pt,
+  linecolor=black,
+  backgroundcolor=white,
+  innerleftmargin=6pt,
+  innerrightmargin=6pt,
+  innertopmargin=4pt,
+  innerbottommargin=4pt,
+  skipabove=6pt,
+  skipbelow=6pt
+]{encart}
+
+% ── Bibliographie ────────────────────────────────────────────────
+\usepackage{natbib}
+
+% ════════════════════════════════════════════════════════════════
+\begin{document}
+
+% ── Page de titre ────────────────────────────────────────────────
+\begin{titlepage}
+\centering
+\vspace*{2cm}
+
+{\LARGE\bfseries
+DÉTECTION DE VARIATIONS ATYPIQUES DANS LES SÉRIES TEMPORELLES
+FINANCIÈRES PAR ARCHITECTURES HYBRIDES VAE-TRANSFORMER \\[0.4em]
+\large\normalfont État de l'art outillé et justification architecturale
+de BiVAT\\[0.4em]
+}
+
+\vspace{2cm}
+
+{\large\bfseries MOUKOKO EKAMBI GEORGES MIGUEL}\\[0.5em]
+{\normalsize\itshape
+Stagiaire, Banque des États de l'Afrique Centrale (BEAC)\\
+M2 Data Science \& IA  ENSPD / Université de Douala, GISDIA Laboratory
+}
+
+\vspace{2cm}
+
+{\normalsize Août 2026}
+
+\vfill
+
+{\small
+Document rédigé dans le cadre du stage de recherche à la Banque des États
+de l'Afrique Centrale (BEAC), M2 Data Science \& IA,
+ENSPD / Université de Douala  GISDIA Laboratory.
+}
+\end{titlepage}
+
+% ── Résumé ───────────────────────────────────────────────────────
+\begin{abstract}
+La détection non supervisée de variations atypiques dans des séries temporelles
+financières multivariées constitue un problème fondamental pour la surveillance
+macroprudentielle. Ce document présente un état de l'art exhaustif et outillé
+des architectures d'intelligence artificielle mobilisées à cette fin, enrichi
+de benchmarks normalisés sur cinq datasets de référence (SMD, MSL, SMAP,
+SWaT, PSM) et d'une matrice qualitative comparative sur dix modèles. Sur la
+base d'une cartographie de trois lacunes structurelles non résolues
+simultanément dans la littérature, quatre choix architecturaux sont justifiés
+empiriquement pour la méthode proposée BiVAT (\textit{Bidirectional
+VAE-Associative Transformer}) : un encodeur hybride Transformer bidirectionnel
+et BiLSTM, la Conformal Prediction pour la quantification d'incertitude, SHAP
+pour l'explicabilité réglementaire, et un critère discriminant hybride combinant
+reconstruction probabiliste VAE et Association Discrepancy. Ce dernier apporte
+un gain documenté de $+18{,}82$ points de F1 moyen par rapport à la
+reconstruction seule (ablation study, Xu et al.\ 2022). Le dispositif est
+dimensionné pour le dataset BEAC-CEMAC (195 observations mensuelles, 55
+indicateurs IFS) et satisfait aux exigences d'auditabilité algorithmique COBAC.
+
+\bigskip
+\noindent\textbf{Mots-clés :} détection d'anomalies, séries temporelles
+multivariées, autoencodeur variationnel, Transformer, BiLSTM, Association
+Discrepancy, Conformal Prediction, SHAP, BEAC, surveillance macroprudentielle.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% ════════════════════════════════════════════════════════════════
+\section{Introduction}
+
+\subsection{Contexte général}
+
+La détection automatique de variations atypiques désigne le processus
+d'identification de patrons dans des données qui s'écartent statistiquement du
+comportement attendu. Dans le domaine monétaire et financier, ces variations
+peuvent signaler des erreurs de collecte, des chocs macroéconomiques exogènes,
+des ruptures structurelles dans les dynamiques de crédit ou de dépôt, ou des
+comportements frauduleux. Pour une institution comme la Banque des États de
+l'Afrique Centrale (BEAC), dont la mission est d'assurer la stabilité monétaire
+dans la zone CEMAC, la détection précoce et fiable de ces variations constitue
+une exigence opérationnelle et réglementaire de premier ordre. La conception de
+tout système de détection automatique destiné à la BEAC est soumise à une
+contrainte supplémentaire non négligeable : l'exigence d'auditabilité
+algorithmique imposée par le cadre de surveillance prudentielle COBAC, qui
+requiert que toute décision automatisée soit traçable, explicable et
+reproductible.
+
+Le dataset de référence de ce travail  les séries monétaires des Autres
+Sociétés de Dépôts (2SR) selon la nomenclature IFS du FMI  présente des
+caractéristiques structurelles qui en font un terrain d'expérimentation
+exigeant : environ 195 observations mensuelles (décembre 2001 à mars 2026),
+environ 55 indicateurs financiers multivariés couvrant l'actif et le passif
+du bilan des institutions de dépôt du Cameroun, une forte hétérogénéité
+d'échelles (en milliards de FCFA), des valeurs manquantes sporadiques, une
+saisonnalité budgétaire marquée et des ruptures structurelles documentées
+(choc Covid-19 en 2020--2021, dynamique de crédit 2024).
+
+\subsection{Pourquoi le cadre non supervisé ?}
+
+En l'absence d'étiquettes d'anomalies historiquement certifiées par un processus
+d'audit formalisé, les approches supervisées sont inapplicables directement. Le
+cadre non supervisé, fondé sur la modélisation de la distribution normale et la
+détection par déviation, est le seul praticable. Parmi les familles de méthodes
+disponibles, les architectures profondes à base d'autoencodeurs variationnels
+(VAE) et de Transformers présentent la cohérence structurelle la plus forte avec
+les caractéristiques du dataset BEAC pour trois raisons : leur capacité à
+modéliser des distributions multivariées complexes sans hypothèses paramétriques
+fortes ; leur aptitude à capturer les dépendances temporelles à longue portée ;
+et leur extensibilité vers des scores probabilistes d'anomalie intégrant
+l'incertitude du modèle.
+
+\subsection{Organisation de ce document}
+
+Ce document est organisé en onze sections. Les sections 2 à 6 constituent
+l'état de l'art technique, organisé en quatre axes (fondations théoriques,
+Transformers, hybrides VAE-Transformer, architectures avancées), enrichi pour
+chaque modèle d'un encart de positionnement benchmark et d'une grille qualitative.
+La section~7 présente la synthèse transversale avec le tableau de benchmarks
+normalisés, la matrice qualitative comparative et la cartographie des lacunes
+ancrée empiriquement. La section~8 constitue la contribution principale de ce
+document : la justification multi-critères des quatre choix architecturaux de
+BiVAT, appuyée sur des ablation studies publiées, des comparaisons empiriques
+et des références réglementaires institutionnelles. Les sections~9 à 11
+présentent respectivement l'architecture BiVAT, sa cohérence avec le dataset
+BEAC, et la conclusion.
+
+% ════════════════════════════════════════════════════════════════
+\section{Cadre Théorique Fondateur}
+
+\subsection{Inférence variationnelle et ELBO}
+
+Soit un ensemble d'observations $\mathcal{X} = \{\mathbf{x}^{(i)}\}_{i=1}^{N}$
+généré par un processus impliquant une variable latente non observée
+$\mathbf{z} \in \mathbb{R}^d$. Le modèle génératif spécifie :
+
+$$p_\theta(\mathbf{x}, \mathbf{z}) = p_\theta(\mathbf{x}|\mathbf{z})\,p(\mathbf{z})$$
+
+La vraisemblance marginale
+$p_\theta(\mathbf{x}) = \int p_\theta(\mathbf{x}|\mathbf{z})\,p(\mathbf{z})\,
+d\mathbf{z}$ est intractable dès que $p_\theta(\mathbf{x}|\mathbf{z})$ est un
+réseau de neurones. L'inférence variationnelle contourne cette intractabilité
+en introduisant une distribution approchée $q_\phi(\mathbf{z}|\mathbf{x})$ et
+en maximisant l'Evidence Lower BOund (ELBO) :
+
+$$\log p_\theta(\mathbf{x}) \;\geq\; \mathcal{L}(\theta, \phi;\,\mathbf{x})
+= \underbrace{\mathbb{E}_{q_\phi(\mathbf{z}|\mathbf{x})}\!\left[
+\log p_\theta(\mathbf{x}|\mathbf{z})\right]}_{\text{terme de reconstruction}}
+- \underbrace{D_{\mathrm{KL}}\!\left(q_\phi(\mathbf{z}|\mathbf{x})
+\;\|\; p(\mathbf{z})\right)}_{\text{terme de régularisation KL}}$$
+
+\subsection{Le mécanisme d'attention multi-têtes}
+
+Vaswani et al.\ (2017) proposent l'opération d'auto-attention à produit scalaire :
+
+$$\mathrm{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) =
+\mathrm{Softmax}\!\left(\frac{\mathbf{Q}\mathbf{K}^\top}{\sqrt{d_k}}\right)\mathbf{V}$$
+
+L'attention multi-têtes concatène $H$ têtes parallèles :
+
+$$\mathrm{MHA}(\mathbf{Q},\mathbf{K},\mathbf{V}) =
+\mathrm{Concat}(\mathrm{head}_1, \ldots, \mathrm{head}_H)\,\mathbf{W}^O$$
+
+La matrice d'attention $\mathbf{A} \in \mathbb{R}^{T\times T}$ encode, pour
+chaque instant $t$, une distribution de poids sur l'ensemble des instants de
+la séquence. Dans le cadre non causal (bidirectionnel), aucun masquage n'est
+appliqué : chaque instant peut s'associer librement à tout autre instant passé
+ou futur. C'est cette propriété qui fonde le choix d'un encodeur Transformer
+non causal dans BiVAT.
+
+% ════════════════════════════════════════════════════════════════
+\section{Axe 1 : Fondations Théoriques}
+
+\subsection{[F1] Kingma \& Welling (2013)  Auto-Encoding Variational Bayes}
+
+\textbf{Problème formel.} Apprendre conjointement une représentation latente
+compacte et probabiliste $q_\phi(\mathbf{z}|\mathbf{x})$ et un modèle génératif
+$p_\theta(\mathbf{x}|\mathbf{z})$ de manière non supervisée, en rendant le
+processus d'optimisation différentiable end-to-end malgré l'opération
+d'échantillonnage.
+
+\textbf{Architecture et paramétrisation.} L'encodeur paramétrise
+$q_\phi(\mathbf{z}|\mathbf{x}) =
+\mathcal{N}(\mathbf{z};\,\boldsymbol{\mu}_\phi(\mathbf{x}),\,
+\mathrm{diag}(\boldsymbol{\sigma}^2_\phi(\mathbf{x})))$ via deux têtes
+linéaires distinctes. L'astuce du reparamétrage rend l'échantillonnage
+différentiable :
+
+$$\mathbf{z} = \boldsymbol{\mu}_\phi(\mathbf{x}) +
+\boldsymbol{\sigma}_\phi(\mathbf{x}) \odot \boldsymbol{\epsilon},
+\qquad \boldsymbol{\epsilon} \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$$
+
+\textbf{Terme KL en forme close.} Pour des gaussiennes diagonales :
+
+$$D_{\mathrm{KL}}\!\left(\mathcal{N}(\boldsymbol{\mu},\boldsymbol{\sigma}^2)
+\;\|\; \mathcal{N}(\mathbf{0},\mathbf{I})\right) =
+-\frac{1}{2}\sum_{j=1}^{d}\left(1 + \log\sigma_j^2 - \mu_j^2 -
+\sigma_j^2\right)$$
+
+\textbf{Score d'anomalie dérivé (An \& Cho, 2015) :}
+
+$$\mathrm{AnoScore}(\mathbf{x}) = -\frac{1}{L}\sum_{\ell=1}^{L}
+\log p_\theta\!\left(\mathbf{x}\mid\mathbf{z}^{(\ell)}\right),
+\quad \mathbf{z}^{(\ell)} \sim q_\phi(\mathbf{z}|\mathbf{x})$$
+
+\textbf{Limites structurelles.} (1)~Indépendance temporelle : chaque observation
+est traitée indépendamment. (2)~Prior gaussienne standard limitant l'expressivité
+face aux données financières hétéroscédastiques. (3)~Factorisation diagonale de
+$q_\phi$ ignorant les corrélations entre dimensions latentes.
+
+\textbf{Positionnement benchmark.} Travail fondationnel sans évaluation sur les
+datasets SMD/MSL/SMAP/SWaT/PSM : le modèle ne traite pas de séries temporelles.
+Il constitue la brique de base de tous les modèles évalués dans le tableau de
+la section~7.
+
+\textbf{Critères architecturaux.} Encodeur non causal (statique) ; score
+probabiliste (reconstruction probability) ; explicabilité nulle ; données
+tabulaires génériques ; complexité attention sans objet.
+
+\textbf{Pertinence pour BiVAT.} Fondamentale. L'ELBO, le reparamétrage et le
+score par reconstruction probability constituent les briques de base de BiVAT.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[F2] An \& Cho (2015)  VAE-Based Anomaly Detection Using
+Reconstruction Probability}
+
+\textbf{Problème formel.} Comment formaliser un critère de décision probabiliste
+exploitant la nature stochastique de l'espace latent pour quantifier l'anomalie
+au-delà de la simple erreur quadratique de reconstruction ?
+
+\textbf{Contribution principale.} An \& Cho formalisent la \textit{reconstruction
+probability} comme score d'anomalie :
+
+$$p_{\mathrm{rec}}(\mathbf{x}) = \frac{1}{L}\sum_{\ell=1}^{L}
+\log p_\theta\!\left(\mathbf{x}\mid\mathbf{z}^{(\ell)}\right),
+\quad \mathbf{z}^{(\ell)} \sim q_\phi(\mathbf{z}|\mathbf{x})$$
+
+Pour $p_\theta(\mathbf{x}|\mathbf{z}) = \mathcal{N}(\hat{\mathbf{x}},
+\sigma^2\mathbf{I})$ :
+
+$$p_{\mathrm{rec}}(\mathbf{x}) \approx
+-\frac{1}{2\sigma^2 L}\sum_{\ell=1}^{L}
+\left\|\mathbf{x} - \hat{\mathbf{x}}^{(\ell)}\right\|^2 + \mathrm{const}$$
+
+Les $L$ tirages Monte Carlo permettent d'estimer l'incertitude de reconstruction :
+pour un point atypique, les reconstructions $\hat{\mathbf{x}}^{(\ell)}$ divergent
+fortement entre les tirages, amplifiant le signal d'anomalie. La règle de décision
+calibre un seuil $\tau$ au $(1-\alpha)$-ième percentile empirique.
+
+\textbf{Limites.} Application uniquement sur données statiques ; absence de
+modélisation des dépendances temporelles ; coût Monte Carlo à l'inférence.
+
+\textbf{Positionnement benchmark.} Travail fondationnel sur données statiques :
+aucun résultat sur SMD/MSL/SMAP/SWaT/PSM. La reconstruction probability est
+reprise comme composante du score dans OmniAnomaly, T-VAE et BiVAT.
+
+\textbf{Critères architecturaux.} Encodeur non causal (statique) ; score
+probabiliste ($L$ tirages MC) ; explicabilité partielle (variance entre tirages) ;
+multivarié natif ; complexité attention sans objet ; domaine médical et générique.
+
+\textbf{Pertinence pour BiVAT.} Élevée. La reconstruction probability constitue
+le composant VAE du score hybride BiVAT.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[F3] Su et al. (2019, KDD)  OmniAnomaly}
+
+\textbf{Problème formel.} Détecter des anomalies dans des séries temporelles
+multivariées $\mathbf{X} \in \mathbb{R}^{T \times D}$ en tenant compte
+simultanément des dépendances temporelles séquentielles et des corrélations
+inter-dimensions.
+
+\textbf{Architecture : GRU-VAE stochastique.}
+
+\textit{Encodeur :}
+$$\mathbf{h}^e_t = \mathrm{GRU}_\phi^e(\mathbf{x}_t,\,\mathbf{h}^e_{t-1}),
+\qquad \mathbf{z}_t = \boldsymbol{\mu}^e_t +
+\boldsymbol{\sigma}^e_t \odot \boldsymbol{\epsilon}_t$$
+
+\textit{Prior temporelle conditionnelle (innovation centrale) :}
+$$p(\mathbf{z}_t | \mathbf{z}_{t-1}) = \mathcal{N}\!\left(\mathbf{z}_t;\;
+\boldsymbol{\mu}^p_t(\mathbf{h}^d_{t-1}),\;
+\boldsymbol{\sigma}^p_t(\mathbf{h}^d_{t-1})\right)$$
+
+\textbf{Fonction objectif (ELBO séquentiel) :}
+$$\mathcal{L}_{\mathrm{OmniAnomaly}} = \sum_{t=1}^T\!\left[
+\mathbb{E}_{q_\phi}\!\left[\log p_\theta(\mathbf{x}_t|\mathbf{z}_t)\right]
+- D_{\mathrm{KL}}\!\left(q_\phi(\mathbf{z}_t|\mathbf{x}_{\leq t})\;\|\;
+p(\mathbf{z}_t|\mathbf{z}_{t-1})\right)\right]$$
+
+\textbf{Limites.} Fenêtre de contexte limitée (oubli GRU pour $T > 50$) ;
+traitement séquentiel interdisant la parallélisation GPU ; absence d'attention
+globale.
+
+\textbf{Positionnement benchmark.}
+
+\smallskip
+\begin{center}
+\small
+\begin{tabular}{lccccc}
+\toprule
+& SMD & MSL & SMAP & SWaT & PSM \\
+\midrule
+P (\%) & 83.68 & 89.02 & 92.49 & 81.42 & 88.39 \\
+R (\%) & 86.82 & 86.37 & 81.99 & 84.30 & 74.46 \\
+F1 (\%) & 85.22 & 87.67 & 86.92 & 82.83 & 80.83 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\smallskip
+\noindent\textit{\small Source : Xu et al.\ 2022, Table~1 (point adjustment).
+F1 moyen sur 5 datasets : 84.69\%.}
+
+\textbf{Critères architecturaux.} Encodeur bidirectionnel (LSTM stochastique +
+normalizing flow) ; score probabiliste ($K$ tirages MC) ; explicabilité partielle
+(par dimension) ; multivarié natif (38 dimensions SMD) ;
+complexité $\mathcal{O}(T)$ LSTM ; domaine industriel/capteurs.
+
+\textbf{Pertinence pour BiVAT.} Élevée. La prior temporelle conditionnelle et
+le score probabiliste séquentiel sont réutilisables. Le GRU sera remplacé par
+le module hybride Transformer + BiLSTM de BiVAT.
+
+% ════════════════════════════════════════════════════════════════
+\section{Axe 2 : Transformers pour la Détection d'Anomalies}
+
+\subsection{[T1] Xu et al. (2022, ICLR Spotlight)  Anomaly Transformer}
+
+\textbf{Problème formel.} La détection non supervisée de points anomaux dans
+les séries temporelles exige du modèle qu'il dérive un critère distinctif
+exploitant la structure temporelle globale, au-delà des associations point-à-point.
+
+\textbf{Observation fondatrice.} En raison de la rareté des anomalies, il est
+extrêmement difficile de construire des associations non triviales depuis les
+points anomaux vers l'ensemble de la série. Les associations des anomalies se
+concentrent donc principalement sur leurs points temporels adjacents. Ce biais
+de concentration adjacente implique un critère discriminant inhérent entre
+points normaux et anormaux.
+
+\textbf{Association Discrepancy  Formalisation.}
+
+\textit{Prior Association :}
+$$\mathcal{P}^{(\ell)}_t(i) = \frac{1}{\sqrt{2\pi}\sigma^{(\ell)}}
+\exp\!\left(-\frac{(i-t)^2}{2(\sigma^{(\ell)})^2}\right),
+\quad i \in \{1,\ldots,T\}$$
+
+\textit{Series Association :}
+$$\mathcal{S}^{(\ell)} = \mathrm{Softmax}\!\left(
+\frac{\mathbf{Q}^{(\ell)}{\mathbf{K}^{(\ell)}}^\top}{\sqrt{d_k}}\right)$$
+
+\textit{Association Discrepancy (divergence KL symétrique) :}
+$$\mathrm{AssDis}^{(\ell)}(\mathbf{X}) = \frac{1}{T}\sum_{t=1}^{T}\!\left[
+\mathrm{KL}\!\left(\mathcal{P}^{(\ell)}_t \;\|\; \mathcal{S}^{(\ell)}_t\right)
++ \mathrm{KL}\!\left(\mathcal{S}^{(\ell)}_t \;\|\;
+\mathcal{P}^{(\ell)}_t\right)\right]$$
+
+\textbf{Stratégie d'entraînement minimax.}
+
+\textit{Phase Maximize :}
+$$\min_{\theta,\sigma}\left\|\mathbf{X} - \hat{\mathbf{X}}\right\|_F^2
+- \lambda\cdot\mathrm{AssDis}(\mathbf{X})$$
+
+\textit{Phase Minimize :}
+$$\min_{\theta,\sigma}\left\|\mathbf{X} - \hat{\mathbf{X}}\right\|_F^2
++ \lambda\cdot\mathrm{AssDis}(\mathbf{X})$$
+
+\textbf{Score d'anomalie final :}
+$$\mathrm{AnoScore}(t) = \mathrm{Softmax}\!\left(
+-\mathrm{AssDis}^{(1:L)}_t\right)\cdot
+\left\|\mathbf{x}_t - \hat{\mathbf{x}}_t\right\|_2$$
+
+\textbf{Architecture.} Stack de $L = 3$ blocs Transformer modifiés avec
+embedding positionnel sinusoïdal. Complexité $\mathcal{O}(T^2 d)$.
+
+\textbf{Limites.} Score déterministe sans intervalle de confiance ; encodeur
+causal uniquement ; score scalaire unique sans distinction des types d'anomalies.
+
+\textbf{Positionnement benchmark.}
+
+\smallskip
+\begin{center}
+\small
+\begin{tabular}{lccccc}
+\toprule
+& SMD & MSL & SMAP & SWaT & PSM \\
+\midrule
+P (\%) & 89.40 & 92.09 & 94.13 & 91.55 & 96.91 \\
+R (\%) & 95.45 & 95.15 & 99.40 & 96.73 & 98.90 \\
+F1 (\%) & 92.33 & 93.59 & 96.69 & 94.07 & 97.89 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\smallskip
+\noindent\textit{\small Source : Xu et al.\ 2022, Table~1 (point adjustment).
+F1 moyen sur 5 datasets : 94.91\%. Modèle de référence dominant sur le panel
+normalisé.}
+
+\textbf{Critères architecturaux.} Encodeur causal (minimax + prior gaussienne
+locale) ; score déterministe ; explicabilité partielle (attention weights) ;
+multivarié natif (55 dimensions MSL) ; complexité $\mathcal{O}(T^2)$ ;
+domaine industriel, spatial, eau.
+
+\textbf{Pertinence pour BiVAT.} Très élevée. L'Association Discrepancy et la
+stratégie minimax sont intégrées dans BiVAT. Le score hybride reconstruction
+$\times$ AssDis apporte $+18{,}82$ points F1 moyen par rapport à la
+reconstruction seule (ablation study complète en section~8.4).
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[T2] Tuli, Casale \& Jennings (2022, VLDB)  TranAD}
+
+\textbf{Problème formel.} Réaliser simultanément la détection et le diagnostic
+d'anomalies dans des données temporelles multivariées dans un cadre Transformer
+unique, à inférence rapide, robuste face à la multi-modalité des données.
+
+\textbf{Architecture : deux décodeurs antagonistes.}
+
+\textit{Encodeur partagé :}
+$$\mathbf{H} = \mathrm{TransformerEncoder}(\mathbf{X}_{t-W:t})
+\in \mathbb{R}^{W \times d_{\mathrm{model}}}$$
+
+\textit{Décodeur 1 et focus score :}
+$$\hat{\mathbf{X}}^{(1)} = \mathcal{D}_1(\mathbf{H}), \qquad
+\mathbf{f}^{(1)}_t = \left\|\mathbf{x}_t -
+\hat{\mathbf{x}}^{(1)}_t\right\|_1 \in \mathbb{R}^D$$
+
+\textit{Décodeur 2 conditionné :}
+$$\hat{\mathbf{X}}^{(2)} = \mathcal{D}_2(\mathbf{H},\,\mathbf{f}^{(1)})$$
+
+\textbf{Fonction objectif adversariale.} Avec $n$ l'indice d'époque :
+$$\mathcal{L} = \frac{1}{n}\,\mathcal{L}^{(1)} +
+\left(1 - \frac{1}{n}\right)\mathcal{L}^{(2)},
+\qquad \mathcal{L}^{(i)} = \frac{1}{W}\sum_t
+\|\mathbf{x}_t - \hat{\mathbf{x}}^{(i)}_t\|_2^2$$
+
+\textbf{Avantage computationnel documenté.} TranAD réduit les temps
+d'entraînement de 75 à 99\% par rapport aux baselines BiLSTM/LSTM grâce à la
+parallélisation du Transformer (Tuli et al.\ 2022, Table~5).
+
+\textbf{Limites.} Absence de composante variationnelle ; score déterministe
+sans intervalle de confiance ; pas d'explicabilité formelle.
+
+\textbf{Positionnement benchmark.}
+
+\smallskip
+\begin{center}
+\small
+\begin{tabular}{lccccc}
+\toprule
+& SMD & MSL & SMAP & SWaT & PSM \\
+\midrule
+P (\%) & 92.62 & 90.38 & 80.43 & 97.60 & \nd \\
+R (\%) & 99.74 & 99.99 & 99.99 & 69.97 & \nd \\
+F1 (\%) & 96.05 & 94.94 & 89.15 & 81.51 & \nd \\
+\bottomrule
+\end{tabular}
+\end{center}
+\smallskip
+\noindent\textit{\small Source : Tuli et al.\ 2022, Table~2 (point adjustment).
+PSM non évalué. F1 moyen sur 4 datasets : 90.41\%. Meilleur F1 sur SMD (96.05\%).}
+
+\textbf{Critères architecturaux.} Encodeur non causal (attention bidirectionnelle
++ focus score) ; score déterministe (deux phases) ; explicabilité partielle
+(focus scores par dimension) ; multivarié natif (123 dimensions WADI) ;
+complexité $\mathcal{O}(T^2)$ ; domaine industriel, IoT.
+
+\textbf{Pertinence pour BiVAT.} Élevée. Le mécanisme de focus score est
+transposable comme signal de conditionnement entre les composantes VAE et
+Transformer de l'encodeur hybride BiVAT.
+
+% ════════════════════════════════════════════════════════════════
+\section{Axe 3 : Hybrides VAE-Transformer}
+
+\subsection{[H1] Song, Seo \& Kim (2023, IEEE Access) 
+Anomaly VAE-Transformer}
+
+\textbf{Problème formel.} Les séries temporelles financières (protocoles DeFi)
+présentent des anomalies à deux échelles distinctes : des pics ponctuels
+détectables localement par le VAE, et des dérives progressives détectables sur
+de longs horizons via le Transformer.
+
+\textbf{Architecture à double branche.}
+
+$$s^{\mathrm{VAE}}_t = -\log p_\theta(\mathbf{w}_t|\mathbf{z}_t), \qquad
+s^{\mathrm{Tr}}_t = \|\mathbf{x}_t - \hat{\mathbf{x}}^{\mathrm{Tr}}_t\|_2$$
+
+$$s_t^{\mathrm{final}} = \alpha\,s^{\mathrm{VAE}}_t +
+(1-\alpha)\,s^{\mathrm{Tr}}_t, \quad \alpha \in [0,1]\text{ appris}$$
+
+\textbf{Résultats sur données DeFi.} F1 = 91.3\% contre 87.2\% pour le VAE
+seul et 88.9\% pour le Transformer seul (Olympus DAO, Uniswap, Aave). Ce modèle
+est le seul de la liste validé sur des données financières réelles.
+
+\textbf{Limite fondamentale.} L'intégration est superficielle : VAE et
+Transformer opèrent dans des espaces distincts, leurs gradients ne s'informent
+pas mutuellement. La fusion est une pondération de scalaires, non une
+intégration dans l'espace de représentation.
+
+\textbf{Positionnement benchmark.} Non évalué sur SMD, MSL, SMAP, SWaT, PSM.
+Données DeFi exclusivement ; comparaison normalisée impossible sans
+réimplémentation. Maintenu dans la matrice qualitative uniquement.
+
+\textbf{Critères architecturaux.} Encodeur non causal (VAE local + Transformer
+long-terme) ; score hybride (scalaire VAE + Transformer) ; pas d'explicabilité ;
+multivarié partiel (DeFi uni/bi-varié) ; complexité $\mathcal{O}(T^2)$ ;
+\textbf{seul modèle validé sur données financières réelles (DeFi blockchain)}.
+
+\textbf{Pertinence pour BiVAT.} Modérée. Ce papier valide la complémentarité
+VAE + Transformer sur données financières, mais l'intégration superficielle est
+la limite précise que BiVAT surmonte par une intégration profonde dans l'espace
+de représentation.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[H2] Li et al. (2025, Expert Systems)  T-VAE}
+
+\textbf{Problème formel.} La détection d'anomalies dans des séries temporelles
+multivariées dont les dépendances séquentielles et inter-dimensions sont
+complexes, non linéaires, avec forte volatilité.
+
+\textbf{Architecture : intégration profonde Transformer-dans-VAE.}
+
+\textit{Étape 1  Embedding :}
+$\mathbf{E}_t = \mathrm{EmbedLayer}(\mathbf{x}_t) + \mathrm{PE}(t)$
+
+\textit{Étape 2  Transformer ($L$ couches) :}
+$\mathbf{H}^{(L)} = \mathrm{TransformerEncoder}^{(1:L)}(\mathbf{E})$
+
+\textit{Étape 3  Projection variationnelle :}
+$$\boldsymbol{\mu}_t = \mathbf{W}_\mu\,\mathbf{H}^{(L)}_t + \mathbf{b}_\mu,
+\qquad \log\boldsymbol{\sigma}^2_t = \mathbf{W}_\sigma\,\mathbf{H}^{(L)}_t
++ \mathbf{b}_\sigma$$
+
+\textbf{Fonction objectif avec KL Annealing :}
+$$\mathcal{L}_{\mathrm{T-VAE}} = \sum_{t=1}^T\left[
+\mathbb{E}_{q_\phi}\!\left[\log p_\theta(\mathbf{x}_t|\mathbf{z}_t)\right]
+- \beta_t\,D_{\mathrm{KL}}\!\left(q_\phi(\mathbf{z}_t|\mathbf{x})
+\;\|\; \mathcal{N}(\mathbf{0},\mathbf{I})\right)\right]$$
+
+\textbf{Score d'anomalie :}
+$$s_t = -\frac{1}{L}\sum_{\ell=1}^L\log p_\theta\!\left(
+\mathbf{x}_t\mid\mathbf{z}^{(\ell)}_t\right) +
+\gamma\,D_{\mathrm{KL}}(q_\phi(\mathbf{z}_t|\mathbf{x})\;\|\;
+\mathcal{N}(\mathbf{0},\mathbf{I}))$$
+
+\textbf{Limites identifiées.} Encodeur causal (attention masquée, pas
+d'information future dans l'espace latent) ; score scalaire unique ; absence
+d'explicabilité formelle.
+
+\textbf{Positionnement benchmark.} Derrière paywall Wiley. Tables P/R/F1 sur
+les 5 datasets de référence non accessibles en libre accès. Aucune
+réimplémentation afin de préserver la rigueur de la comparaison. Maintenu
+dans la matrice qualitative en tant que référence architecturale directe.
+
+\textbf{Critères architecturaux.} Encodeur bidirectionnel (Transformer +
+projection VAE) ; score probabiliste ; pas d'explicabilité ; multivarié natif ;
+complexité $\mathcal{O}(T^2)$ ; données industrielles.
+
+\textbf{Pertinence pour BiVAT.} Très élevée. T-VAE est l'architecture la plus
+proche de BiVAT. Les contributions de BiVAT par rapport au T-VAE sont :
+(i)~encodeur hybride Transformer + BiLSTM pour les petits volumes ; (ii)~Conformal
+Prediction pour les intervalles de confiance ; (iii)~Association Discrepancy
+dans la fonction objectif.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[H3] Wang et al. (2022, Measurement) 
+Variational Transformer-based Anomaly Detection}
+
+\textbf{Problème formel.} Formaliser l'intégration de la stochasticité
+variationnelle au sein du flux d'attention du Transformer.
+
+\textbf{Architecture : couche d'attention variationnelle.} Après le calcul de
+$\mathrm{Softmax}(\mathbf{QK}^\top/\sqrt{d_k})$, un MLP produit
+$\boldsymbol{\mu}_{\mathrm{attn}}$ et $\boldsymbol{\sigma}_{\mathrm{attn}}$ :
+$$\mathbf{z}_{\mathrm{attn}} \sim \mathcal{N}(\boldsymbol{\mu}_{\mathrm{attn}},
+\,\mathrm{diag}(\boldsymbol{\sigma}^2_{\mathrm{attn}})), \qquad
+\mathbf{H} = \mathbf{z}_{\mathrm{attn}}\,\mathbf{V}$$
+
+\textbf{Score d'anomalie :}
+$$s_t = -\log p_\theta(\mathbf{x}_t|\mathbf{z}_{\mathrm{attn},\leq t})
++ \lambda\,D_{\mathrm{KL}}(\mathcal{N}(\boldsymbol{\mu}_{\mathrm{attn},t},
+\boldsymbol{\sigma}^2_{\mathrm{attn},t})\|\mathcal{N}(\mathbf{0},\mathbf{I}))$$
+
+\textbf{Positionnement benchmark.} Derrière paywall Elsevier. Résultats non
+accessibles. Maintenu dans la matrice qualitative uniquement.
+
+\textbf{Critères architecturaux.} Encodeur non causal (Transformer + VAE sur
+espace d'attention) ; score probabiliste ; pas d'explicabilité formelle ;
+multivarié natif ; complexité $\mathcal{O}(T^2)$ ; données industrielles.
+
+\textbf{Pertinence pour BiVAT.} Élevée. L'injection de stochasticité dans
+le mécanisme d'attention ouvre la voie à des distributions d'attention
+incertaines interprétables comme des distributions sur les associations
+temporelles.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[H4] Zhang et al. (2021, CCDC) 
+Transformer-based VAE Non Supervisé}
+
+\textbf{Positionnement historique.} Premier travail proposant explicitement le
+remplacement des couches GRU d'OmniAnomaly par des blocs d'attention multi-têtes,
+constituant le premier Transformer-VAE pour la détection d'anomalies non
+supervisée dans les séries multivariées.
+
+\textbf{Architecture.}
+$$\mathbf{H} = \mathrm{MultiHeadAttn}(\mathbf{X}, \mathbf{X}, \mathbf{X})
++ \mathbf{X}, \qquad
+\boldsymbol{\mu}_t,\,\boldsymbol{\sigma}_t = \mathrm{MLP}(\mathbf{H}_t)$$
+
+Le décodeur reste un LSTM. Gains rapportés : $+2$ à $+5$ points F1 sur
+OmniAnomaly sur SMD et MSL.
+
+\textbf{Positionnement benchmark.} Résultats disponibles sur SMD et MSL
+uniquement. Non inclus dans le tableau normalisé à 5 datasets.
+
+\textbf{Critères architecturaux.} Encodeur bidirectionnel (Transformer non
+masqué) ; score probabiliste (VAE) ; pas d'explicabilité ; multivarié natif ;
+complexité $\mathcal{O}(T^2)$ ; données industrielles.
+
+\textbf{Pertinence pour BiVAT.} Élevée. Pont historique essentiel pour la
+narration OmniAnomaly $\rightarrow$ Transformer-VAE $\rightarrow$ BiVAT.
+
+% ════════════════════════════════════════════════════════════════
+\section{Axe 4 : Architectures Avancées}
+
+\subsection{[A1] He et al. (2024, Information Sciences)  VAEAT}
+
+\textbf{Problème formel.} Les données d'entraînement d'un VAE peuvent être
+contaminées par des anomalies non étiquetées, dégradant la qualité de
+reconstruction. Comment rendre le VAE robuste via un entraînement adversarial ?
+
+\textbf{Architecture : deux VAE hybrides LSTM + Attention.}
+
+$$\mathbf{h}^{\mathrm{LSTM}}_t =
+\mathrm{LSTM}_\phi(\mathbf{x}_t,\,\mathbf{h}^{\mathrm{LSTM}}_{t-1}), \qquad
+\mathbf{h}^{\mathrm{attn}}_t =
+\mathrm{MHA}(\mathbf{h}^{\mathrm{LSTM}},
+\mathbf{h}^{\mathrm{LSTM}},\mathbf{h}^{\mathrm{LSTM}})_t$$
+$$\tilde{\mathbf{h}}_t = \mathrm{LayerNorm}(\mathbf{h}^{\mathrm{LSTM}}_t
++ \mathbf{h}^{\mathrm{attn}}_t)$$
+
+\textbf{Stratégie en deux phases.} Phase~1 : deux VAE reconstituent les
+données. Phase~2 : un discriminateur $\mathcal{D}$ distingue les résidus
+normaux des résidus anormaux.
+
+$$\mathcal{L}_{\mathrm{VAEAT}} = \mathcal{L}^{(1)}_{\mathrm{ELBO}}
++ \mathcal{L}^{(2)}_{\mathrm{ELBO}} + \lambda\,\mathcal{L}_{\mathrm{adv}},
+\qquad
+s_t = \alpha\,s^{(1)}_t + (1-\alpha)\,s^{(2)}_t +
+\beta\,(1-\mathcal{D}(\mathbf{r}_t))$$
+
+\textbf{Positionnement benchmark.}
+
+\smallskip
+\begin{center}
+\small
+\begin{tabular}{lccccc}
+\toprule
+& SMD & MSL & SMAP & SWaT & PSM \\
+\midrule
+P (\%) & 95.18 & 95.22 & 89.43 & 93.63 & 95.78 \\
+R (\%) & 96.54 & 99.99 & 99.51 & 93.50 & 96.74 \\
+F1 (\%) & 95.71 & 97.35 & 92.96 & 93.57 & 96.26 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\smallskip
+\noindent\textit{\small Source : He et al.\ 2024, Table~3 (point adjustment).
+F1 moyen : 95.17\%. Meilleurs F1 VAE sur SMD et MSL du panel normalisé.}
+
+\textbf{Critères architecturaux.} Encodeur non causal (LSTM + attention
+bidirectionnelle) ; score probabiliste (VAE + discriminateur) ; pas
+d'explicabilité ; multivarié natif (55 dimensions MSL) ; complexité $\mathcal{O}(T)$
+LSTM ; données industrielles.
+
+\textbf{Pertinence pour BiVAT.} Très élevée. VAEAT valide empiriquement que
+l'hybride LSTM + attention bidirectionnelle atteint les meilleures performances
+VAE sur SMD (95.71\%) et MSL (97.35\%). La stratégie adversariale deux phases
+est adaptable pour les chocs COVID-19 non étiquetés du dataset BEAC.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[A2] Xie et al. (2025, CMC)  VLT-Anomaly}
+
+\textbf{Problème formel.} Adresser simultanément l'absence de dépendances
+bidirectionnelles, les dépendances long-terme insuffisantes et la détection à
+grain unique des méthodes existantes.
+
+\textbf{Solutions architecturales.} $\beta$-VAE avec hyperparamètre KL
+contrôlé ; module hybride Transformer + BiLSTM (le Transformer pour les
+dépendances globales, le BiLSTM pour la modélisation bidirectionnelle locale) ;
+score par moyennage prédiction-reconstruction. L'ablation (Table~3, Xie et al.\
+2025) confirme que BiLSTM seul, Transformer seul et VAE seul sont tous
+inférieurs à l'hybride complet.
+
+\textbf{Positionnement benchmark.} Évalué exclusivement sur NAB (séries
+univariées). Aucun résultat sur SMD/MSL/SMAP/SWaT/PSM. Maintenu dans la
+matrice qualitative ; cité pour son ablation study sur l'hybride
+Transformer + BiLSTM.
+
+\textbf{Critères architecturaux.} Encodeur bidirectionnel ($\beta$-VAE +
+BiLSTM + Transformer) ; score déterministe ; pas d'explicabilité ; univarié
+(NAB) ; complexité $\mathcal{O}(T^2) + \mathcal{O}(T)$ ; données partiellement
+financières (NAB).
+
+\textbf{Pertinence pour BiVAT.} Très élevée. VLT-Anomaly fournit la validation
+de principe la plus directe de l'encodeur hybride Transformer + BiLSTM retenu
+dans BiVAT. L'ablation Table~3 est citée en section~8.1.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[A3] Zhang et al. (2025, Engineering Applications of AI) 
+SHAPAttenVAE}
+
+\textbf{Problème formel.} Rendre explicable chaque décision d'anomalie d'un VAE
+par attribution quantitative dimensionnelle, dans un cadre réglementaire exigeant
+l'auditabilité.
+
+\textbf{Architecture et mécanisme d'explicabilité.}
+
+\textit{Poids d'attention inter-couches :}
+$$\boldsymbol{\alpha}^{(\ell)}_t =
+\mathrm{Softmax}(\mathbf{W}^{(\ell)}\,\mathbf{h}^{(\ell-1)}_t)
+\in \mathbb{R}^D$$
+
+\textit{Valeurs SHAP locales :}
+$$\phi_d(\mathbf{x}_t) = \sum_{S \subseteq \mathcal{D}\setminus\{d\}}
+\frac{|S|!\,(D-|S|-1)!}{D!}
+\left[s(\mathbf{x}_{S\cup\{d\}}) - s(\mathbf{x}_S)\right]$$
+
+\textit{Perte de cohérence :}
+$$\mathcal{L}_{\mathrm{expl}} = \sum_t
+\left\|\boldsymbol{\alpha}_t - \hat{\boldsymbol{\phi}}_t\right\|_2^2$$
+
+\textbf{Positionnement benchmark.} Derrière paywall ScienceDirect
+(DOI: 10.1016/j.engappai.2025.111585). Résultats non accessibles. Maintenu
+dans la matrice qualitative ; mécanisme SHAP inter-couches directement repris
+dans BiVAT.
+
+\textbf{Critères architecturaux.} Encodeur non causal (MHA + VAE) ; score
+probabiliste ; \textbf{explicabilité SHAP inter-couches formelle} ; multivarié
+natif ; complexité $\mathcal{O}(T^2)$ ; données industrielles.
+
+\textbf{Pertinence pour BiVAT.} Très élevée. SHAPAttenVAE est la seule
+architecture de la littérature à avoir intégré SHAP formellement dans un VAE
+avec couches d'attention. L'exigence COBAC fait de ce mécanisme une nécessité
+fonctionnelle.
+
+% ──────────────────────────────────────────────────────────────
+\subsection{[A4] Sellam et al. (2025, Engineering Applications of AI)  MAAT}
+
+\textbf{Problème formel.} Conserver la qualité de modélisation des dépendances
+longue portée tout en réduisant la complexité $\mathcal{O}(T^2)$ de l'attention
+standard à $\mathcal{O}(T)$.
+
+\textbf{Mamba : State Space Model sélectif.}
+$$\mathbf{h}_t = \bar{\mathbf{A}}\,\mathbf{h}_{t-1} +
+\bar{\mathbf{B}}\,\mathbf{u}_t, \qquad \mathbf{y}_t = \mathbf{C}\,\mathbf{h}_t$$
+
+\textbf{Architecture MAAT.} Sparse Attention $\mathcal{O}(T \log T)$ +
+Mamba-SSM $\mathcal{O}(T)$ + Gated Attention adaptatif.
+
+\textbf{Positionnement benchmark.}
+
+\smallskip
+\begin{center}
+\small
+\begin{tabular}{lccccc}
+\toprule
+& SMD & MSL & SMAP & SWaT & PSM \\
+\midrule
+P (\%) & 90.03 & 93.23 & 95.37 & 91.27 & \nd \\
+R (\%) & 99.29 & 97.55 & 99.32 & 97.32 & \nd \\
+F1 (\%) & 94.51 & 95.05 & 96.99 & 94.16 & 98.76 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\smallskip
+\noindent\textit{\small Source : arXiv:2502.07858, Table~1 (deltas par rapport
+à l'Anomaly Transformer). F1 moyen : 95.89\%. Modèle le plus performant du
+panel normalisé.}
+
+\textbf{Critères architecturaux.} Encodeur causal + Mamba SSM ; score
+déterministe (AssDis) ; pas d'explicabilité ; multivarié natif (38 dimensions) ;
+complexité $\mathcal{O}(T)$ Mamba / $\mathcal{O}(T \log T)$ sparse attention ;
+données industrielles.
+
+\textbf{Pertinence pour BiVAT.} Modérée. Pour $T = 195$, la complexité
+quadratique est négligeable. Mamba constitue une variante d'encodeur intégrable
+si BiVAT est déployé sur fréquences journalières ou hebdomadaires.
+
+% ════════════════════════════════════════════════════════════════
+\section{Synthèse Transversale et Cartographie des Lacunes}
+
+\subsection{Tableau de benchmarks normalisés}
+
+\textit{Note méthodologique.} Toutes les métriques sont en pourcentage. Le
+protocole majoritaire est le \textit{point adjustment} (PA) : si au moins un
+point d'un segment anormal est détecté, tout le segment est crédité. Ce
+protocole tend à gonfler les scores par rapport à une évaluation strictement
+point-à-point. Les cinq modèles marqués \nd{} (T-VAE, VLT-Anomaly,
+SHAPAttenVAE, Anomaly VAE-Transformer, Variational Transformer) ne disposent
+pas de résultats publics sur ce panel : soit les papiers sont derrière paywall
+(T-VAE, SHAPAttenVAE, Variational Transformer), soit les modèles ont été
+évalués sur des datasets incompatibles (VLT-Anomaly sur NAB, Anomaly
+VAE-Transformer sur données DeFi). Aucune réimplémentation n'a été réalisée
+afin de préserver la rigueur de la comparaison.
+
+\begin{landscape}
+\begin{longtable}{llcccl}
+\caption{Benchmarks normalisés  Precision (P), Recall (R), F1 (\%).}
+\label{tab:benchmarks}\\
+\toprule
+\textbf{Modèle} & \textbf{Dataset} & \textbf{P} & \textbf{R} &
+\textbf{F1} & \textbf{Source} \\
+\midrule
+\endfirsthead
+\multicolumn{6}{c}{\tablename~\thetable{}  Suite}\\
+\toprule
+\textbf{Modèle} & \textbf{Dataset} & \textbf{P} & \textbf{R} &
+\textbf{F1} & \textbf{Source} \\
+\midrule
+\endhead
+\midrule\multicolumn{6}{r}{Suite page suivante\ldots}\endfoot
+\bottomrule\endlastfoot
+
+\multirow{5}{*}{\textbf{OmniAnomaly}}
+ & SMD  & 83.68 & 86.82 & 85.22 & Xu et al.\ 2022, Table~1 \\
+ & MSL  & 89.02 & 86.37 & 87.67 & idem \\
+ & SMAP & 92.49 & 81.99 & 86.92 & idem \\
+ & SWaT & 81.42 & 84.30 & 82.83 & idem \\
+ & PSM  & 88.39 & 74.46 & 80.83 & idem \\
+\midrule
+\multirow{5}{*}{\textbf{Anomaly Transformer}}
+ & SMD  & 89.40 & 95.45 & 92.33 & Xu et al.\ 2022, Table~1 \\
+ & MSL  & 92.09 & 95.15 & 93.59 & idem \\
+ & SMAP & 94.13 & 99.40 & 96.69 & idem \\
+ & SWaT & 91.55 & 96.73 & 94.07 & idem \\
+ & PSM  & 96.91 & 98.90 & 97.89 & idem \\
+\midrule
+\multirow{5}{*}{\textbf{TranAD}}
+ & SMD  & 92.62 & 99.74 & 96.05 & Tuli et al.\ 2022, Table~2 \\
+ & MSL  & 90.38 & 99.99 & 94.94 & idem \\
+ & SMAP & 80.43 & 99.99 & 89.15 & idem \\
+ & SWaT & 97.60 & 69.97 & 81.51 & idem \\
+ & PSM  & \nd   & \nd   & \nd   & Non évalué dans le papier \\
+\midrule
+\multirow{5}{*}{\textbf{T-VAE}}
+ & SMD  & \nd & \nd & \nd &
+   \multirow{5}{*}{Li et al.\ 2025  paywall Wiley} \\
+ & MSL  & \nd & \nd & \nd & \\
+ & SMAP & \nd & \nd & \nd & \\
+ & SWaT & \nd & \nd & \nd & \\
+ & PSM  & \nd & \nd & \nd & \\
+\midrule
+\multirow{5}{*}{\textbf{VLT-Anomaly}}
+ & SMD  & \nd & \nd & \nd &
+   \multirow{5}{*}{Xie et al.\ 2025  NAB uniquement} \\
+ & MSL  & \nd & \nd & \nd & \\
+ & SMAP & \nd & \nd & \nd & \\
+ & SWaT & \nd & \nd & \nd & \\
+ & PSM  & \nd & \nd & \nd & \\
+\midrule
+\multirow{5}{*}{\textbf{SHAPAttenVAE}}
+ & SMD  & \nd & \nd & \nd &
+   \multirow{5}{*}{Zhang et al.\ 2025  paywall ScienceDirect} \\
+ & MSL  & \nd & \nd & \nd & \\
+ & SMAP & \nd & \nd & \nd & \\
+ & SWaT & \nd & \nd & \nd & \\
+ & PSM  & \nd & \nd & \nd & \\
+\midrule
+\multirow{5}{*}{\textbf{MAAT}}
+ & SMD  & 90.03 & 99.29 & 94.51 & arXiv:2502.07858, Table~1 \\
+ & MSL  & 93.23 & 97.55 & 95.05 & idem ($+1.46$ pts vs AT) \\
+ & SMAP & 95.37 & 99.32 & 96.99 & idem ($+0.30$ pts vs AT) \\
+ & SWaT & 91.27 & 97.32 & 94.16 & idem ($+0.09$ pts vs AT) \\
+ & PSM  & \nd   & \nd   & 98.76 & idem ($+0.87$ pts vs AT) \\
+\midrule
+\multirow{5}{*}{\textbf{VAEAT}}
+ & SMD  & 95.18 & 96.54 & 95.71 & He et al.\ 2024, Table~3 \\
+ & MSL  & 95.22 & 99.99 & 97.35 & idem \\
+ & SMAP & 89.43 & 99.51 & 92.96 & idem \\
+ & SWaT & 93.63 & 93.50 & 93.57 & idem \\
+ & PSM  & 95.78 & 96.74 & 96.26 & idem \\
+\midrule
+\multirow{5}{*}{\textbf{Anomaly VAE-Transf.}}
+ & SMD  & \nd & \nd & \nd &
+   \multirow{5}{*}{Song et al.\ 2023  données DeFi uniquement} \\
+ & MSL  & \nd & \nd & \nd & \\
+ & SMAP & \nd & \nd & \nd & \\
+ & SWaT & \nd & \nd & \nd & \\
+ & PSM  & \nd & \nd & \nd & \\
+\midrule
+\multirow{5}{*}{\textbf{Variational Transformer}}
+ & SMD  & \nd & \nd & \nd &
+   \multirow{5}{*}{Wang et al.\ 2022  paywall Elsevier} \\
+ & MSL  & \nd & \nd & \nd & \\
+ & SMAP & \nd & \nd & \nd & \\
+ & SWaT & \nd & \nd & \nd & \\
+ & PSM  & \nd & \nd & \nd & \\
+\end{longtable}
+\end{landscape}
+
+\subsection{Matrice qualitative comparative}
+
+\begin{landscape}
+\begin{longtable}{p{3cm}p{2.5cm}p{2.2cm}p{2cm}p{1.8cm}p{2.5cm}p{2.5cm}}
+\caption{Matrice qualitative des critères architecturaux.}
+\label{tab:qualitative}\\
+\toprule
+\textbf{Modèle} & \textbf{Encodeur} & \textbf{Score} &
+\textbf{Explicab.} & \textbf{Multivar.} &
+\textbf{Complexité} & \textbf{Finance} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Modèle} & \textbf{Encodeur} & \textbf{Score} &
+\textbf{Explicab.} & \textbf{Multivar.} &
+\textbf{Complexité} & \textbf{Finance} \\
+\midrule
+\endhead
+\bottomrule\endlastfoot
+OmniAnomaly & Bidir. (LSTM stoch.) & Probabiliste & Partielle & Oui &
+$\mathcal{O}(T)$ & Non \\
+\midrule
+Anomaly Transf. & Causal (minimax) & Déterministe & Partielle & Oui &
+$\mathcal{O}(T^2)$ & Non \\
+\midrule
+TranAD & Non causal (bidir.) & Déterministe & Partielle & Oui &
+$\mathcal{O}(T^2)$ & Non \\
+\midrule
+T-VAE & Bidir. (Transf.+VAE) & Probabiliste & Non & Oui &
+$\mathcal{O}(T^2)$ & Non \\
+\midrule
+VLT-Anomaly & Bidir. ($\beta$-VAE+BiLSTM+Transf.) & Déterministe & Non & Non &
+$\mathcal{O}(T^2{+}T)$ & Partielle \\
+\midrule
+SHAPAttenVAE & Non causal (MHA+VAE) & Probabiliste & \textbf{Oui (SHAP)} & Oui &
+$\mathcal{O}(T^2)$ & Non \\
+\midrule
+MAAT & Causal + Mamba & Déterministe & Non & Oui &
+$\mathcal{O}(T)$ & Non \\
+\midrule
+VAEAT & Non causal (LSTM+attn.) & Probabiliste & Non & Oui &
+$\mathcal{O}(T)$ & Non \\
+\midrule
+Anomaly VAE-Transf. & Non causal (VAE+Transf.) & Hybride & Non & Partiel &
+$\mathcal{O}(T^2)$ & \textbf{Oui (DeFi)} \\
+\midrule
+Variational Transf. & Non causal (Transf.+VAE) & Probabiliste & Non & Oui &
+$\mathcal{O}(T^2)$ & Non \\
+\end{longtable}
+\end{landscape}
+
+\subsection{Cartographie des trois lacunes structurelles}
+
+L'analyse croisée du tableau de benchmarks (Table~\ref{tab:benchmarks}) et de
+la matrice qualitative (Table~\ref{tab:qualitative}) révèle trois lacunes
+complémentaires que la littérature n'a pas encore comblées simultanément dans
+un cadre unifié.
+
+\subsubsection{Lacune L1  Intégration profonde avec encodeur hybride
+bidirectionnel adapté au faible volume}
+
+Les hybrides à fusion superficielle (Song et al.\ 2023) n'enrichissent pas
+mutuellement les espaces de représentation. Les modèles à intégration profonde
+(T-VAE, Li et al.\ 2025) réalisent une avancée majeure mais souffrent de deux
+limites complémentaires : leur Transformer interne est causal, et leurs
+performances sur petits volumes ($N < 300$) sont documentées comme
+sous-optimales (Nakashima et al.\ 2023 : Transformer surpassé par des
+architectures plus simples de 25 à 60\% sur petites séries). La matrice
+qualitative confirme qu'aucun modèle ne combine simultanément intégration
+profonde, bidirectionnalité et architecture hybride Transformer + BiLSTM
+compensant la faiblesse des Transformers purs sur faible volume. VLT-Anomaly
+(Xie et al.\ 2025) est le seul à proposer l'hybride Transformer + BiLSTM mais
+sans intégration profonde dans l'espace latent VAE et sans évaluation sur les
+datasets de référence.
+
+\subsubsection{Lacune L2  Quantification formelle de l'incertitude sur le
+score d'anomalie}
+
+Sur les cinq modèles avec résultats normalisés, quatre produisent des scores
+déterministes (Anomaly Transformer, TranAD, MAAT) ou probabilistes sans
+intervalle de confiance formel (OmniAnomaly, VAEAT). Aucun ne fournit de
+garantie de coverage sur le score d'anomalie. La Conformal Prediction, seule
+méthode offrant une garantie formelle
+$\Pr(\hat{y} \in C_\alpha) \geq 1 - \alpha$ sans hypothèse distributionnelle
+(Vovk et al.\ 2005), n'est intégrée dans aucun des modèles du corpus. Dans
+le contexte BEAC, cette lacune a une implication opérationnelle directe : un
+superviseur prudentiel nécessite non seulement un score scalaire mais une mesure
+de la certitude de la décision pour calibrer la priorité des investigations.
+
+\subsubsection{Lacune L3  Explicabilité formelle compatible avec l'audit
+réglementaire}
+
+La matrice qualitative révèle que sur dix modèles, un seul dispose d'une
+explicabilité formelle (SHAPAttenVAE), dont les résultats quantitatifs ne sont
+pas accessibles en libre accès. Les deux autres mentions d'explicabilité partielle
+(OmniAnomaly par dimension, Anomaly Transformer par attention weights) ne
+satisfont pas les exigences d'auditabilité réglementaire bancaire définies par
+le BIS FSI (2024) et l'ECB Guide to Internal Models (2025), qui exigent une
+attribution causale par feature reproductible et auditable. SHAP est la seule
+méthode explicitement citée dans les rapports de conformité réglementaire
+ICAAP/CCAR (SHARC, arXiv:2607.05484). Aucun modèle du corpus ne combine
+intégration SHAP formelle et résultats publics sur les datasets de référence.
+
+% ════════════════════════════════════════════════════════════════
+\section{Justification Multi-Critères des Choix Architecturaux BiVAT}
+
+Cette section justifie empiriquement et réglementairement les quatre décisions
+architecturales qui définissent BiVAT, sur la base des lacunes L1, L2 et L3
+identifiées en section~7 et des comparaisons empiriques publiées.
+
+\subsection{Choix D1  Encodeur hybride Transformer bidirectionnel + BiLSTM}
+
+\subsubsection{Problème de décision}
+
+L'encodeur de BiVAT doit satisfaire trois contraintes simultanées : (1)~capturer
+les dépendances temporelles à longue portée pour les 55 indicateurs IFS sur
+195 observations ; (2)~être bidirectionnel pour le mode d'audit a posteriori
+de la BEAC où la série complète est disponible ; (3)~rester performant sur
+$N = 195$ observations, en dessous du seuil critique documenté pour les
+Transformers purs.
+
+\subsubsection{Alternatives considérées}
+
+Trois architectures d'encodeur ont été comparées : (1)~Transformer
+bidirectionnel seul  attention non masquée, $\mathcal{O}(T^2)$, parallélisable ;
+(2)~BiLSTM seul  bidirectionnel, $\mathcal{O}(T)$, adapté aux petits volumes ;
+(3)~Hybride Transformer + BiLSTM  Transformer pour les dépendances globales,
+BiLSTM pour les dépendances locales bidirectionnelles.
+
+\subsubsection{Données empiriques comparatives}
+
+\begin{longtable}{p{4.5cm}p{3cm}p{2cm}p{2cm}p{4cm}}
+\caption{Comparaison empirique Transformer bidirectionnel vs BiLSTM vs Hybride.}
+\label{tab:d1}\\
+\toprule
+\textbf{Modèle} & \textbf{Dataset} & \textbf{Métrique} &
+\textbf{Valeur} & \textbf{Source} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Modèle} & \textbf{Dataset} & \textbf{Métrique} &
+\textbf{Valeur} & \textbf{Source} \\
+\midrule
+\endhead
+\bottomrule\endlastfoot
+MSTN-Transformer & Exchange Rate (financier) & MSE & 0.668 &
+arXiv:2511.20577 \\
+MSTN-BiLSTM & Exchange Rate (financier) & MSE & \textbf{0.408} &
+idem  BiLSTM supérieur \\
+\midrule
+Transformer seul & SMAP/MSL (petit volume) & F1 relatif & $-25$\% à $-60$\% &
+Nakashima et al.\ 2023, PHM \\
+\midrule
+VAE-BiLSTM seul & NAB & F1 & inférieur hybride &
+Xie et al.\ 2025, Table~3 ablation \\
+VAE-Transformer seul & NAB & F1 & inférieur hybride & idem \\
+\textbf{Hybride Transf.+BiLSTM} & NAB & F1 & \textbf{supérieur} &
+idem  hybride systématiquement meilleur \\
+\midrule
+VAEAT (LSTM+attn. bidir.) & SMD & F1 & \textbf{95.71} &
+He et al.\ 2024, Table~3 \\
+VAEAT & MSL & F1 & \textbf{97.35} & idem \\
+\midrule
+TranAD vs BiLSTM/LSTM & SMD/MSL/SMAP/SWaT & Temps entraîn. &
+$-75$\% à $-99$\% & Tuli et al.\ 2022, Table~5 \\
+\end{longtable}
+
+\subsubsection{Analyse de complexité computationnelle}
+
+\begin{table}[ht]
+\centering
+\caption{Complexité de l'encodeur BiVAT ($T=195$, $d=55$, $h$ : dim. cachée,
+$z$ : dim. latente).}
+\label{tab:complexite-d1}
+\small
+\begin{tabular}{p{4cm}p{3cm}p{3cm}p{4cm}}
+\toprule
+\textbf{Composante} & \textbf{Complexité temp.} &
+\textbf{Complexité spatiale} & \textbf{Remarque} \\
+\midrule
+Transformer non causal & $\mathcal{O}(T^2 d)$ & $\mathcal{O}(T^2)$ &
+$T=195$ : 38\,025 ops. attn. \\
+BiLSTM & $\mathcal{O}(T h^2)$ & $\mathcal{O}(h)$ &
+Linéaire en $T$ \\
+Hybride (BiLSTM $\to$ Transf.) & $\mathcal{O}(T h^2 + T^2 d)$ &
+$\mathcal{O}(T^2)$ & Dominé par Transformer \\
+Projection VAE & $\mathcal{O}(d z)$ & $\mathcal{O}(z)$ & Négligeable \\
+\midrule
+\textbf{BiVAT encodeur complet} & $\mathcal{O}(T h^2 + T^2 d)$ &
+$\mathcal{O}(T^2)$ & Entraînable CPU standard \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Décision et justification}
+
+\textbf{D1 : BiVAT adopte l'encodeur hybride Transformer bidirectionnel +
+BiLSTM.} Justification empirique : (1)~le BiLSTM est supérieur au Transformer
+seul sur les séries financières courtes (MSE 0.408 vs 0.668, Exchange Rate) ;
+(2)~le Transformer seul est sous-performant de 25 à 60\% sur les petits
+volumes (Nakashima et al.\ 2023) ; (3)~l'hybride est systématiquement supérieur
+aux deux composantes isolées (VLT-Anomaly Table~3, VAEAT Table~3). Le Transformer
+apporte la parallélisation ($-75$\% à $-99$\% temps d'entraînement, TranAD
+Table~5) ; le BiLSTM stabilise l'apprentissage sur faible volume. Pour
+$T = 195$ et $d = 55$, le coût est négligeable sur CPU standard.
+
+\subsection{Choix D2  Conformal Prediction pour la quantification
+d'incertitude}
+
+\subsubsection{Problème de décision}
+
+BiVAT doit produire un intervalle de confiance $[s_t - \delta_t, s_t + \delta_t]$
+permettant de distinguer les anomalies à haute confiance des anomalies ambiguës.
+Trois familles de méthodes sont candidates.
+
+\subsubsection{Comparaison empirique des trois approches}
+
+\begin{longtable}{p{3.2cm}p{3cm}p{2.8cm}p{2.8cm}p{3.5cm}}
+\caption{Comparaison MC Dropout, Deep Ensembles, Conformal Prediction.}
+\label{tab:d2}\\
+\toprule
+\textbf{Critère} & \textbf{MC Dropout} &
+\textbf{Deep Ensembles} & \textbf{Conformal Pred.} &
+\textbf{Source} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Critère} & \textbf{MC Dropout} &
+\textbf{Deep Ensembles} & \textbf{Conformal Pred.} &
+\textbf{Source} \\
+\midrule
+\endhead
+\bottomrule\endlastfoot
+Garantie coverage & Aucune & Aucune &
+\textbf{$\Pr(\hat{y}\in C_\alpha) \geq 1-\alpha$} &
+Vovk et al.\ 2005 \\
+\midrule
+Calibration ECE & Overconfident & Meilleure ECE &
+Distribution-free exact &
+Lakshminarayanan 2017 NeurIPS \\
+\midrule
+Coût entraînement & 0 & $\times M$ modèles & \textbf{0} &  \\
+\midrule
+Coût inférence & $K$ passes & $M$ passes & \textbf{1 quantile} &  \\
+\midrule
+Mémoire & $\times 1$ & $\times M$ & \textbf{calibration set} &  \\
+\midrule
+Faible volume ($N<200$) & Risqué & Risqué &
+\textbf{SSBC} garanties &
+arXiv:2509.15349 \\
+\midrule
+Déséquilibre classes & Non adressé & Non adressé &
+\textbf{CP class-cond.} : 90.59\% vs 52.94\% &
+MDPI 2026 \\
+\midrule
+Non-stationnarité & Non adressé & Non adressé &
+\textbf{EnbPI} garanti asymptotique &
+Chen \& Xie 2021 \\
+\end{longtable}
+
+\subsubsection{Analyse de complexité computationnelle}
+
+\begin{table}[ht]
+\centering
+\caption{Complexité des méthodes d'incertitude ($N=195$, $M=5$, $K=20$).}
+\label{tab:complexite-d2}
+\small
+\begin{tabular}{p{3.5cm}p{2.5cm}p{2.5cm}p{2.5cm}p{3.5cm}}
+\toprule
+\textbf{Phase} & \textbf{MC Dropout} &
+\textbf{Deep Ensembles} & \textbf{Conf. Pred.} &
+\textbf{Remarque} \\
+\midrule
+Entraînement & 0 & $\times 5$ & \textbf{0} & CP post-hoc pur \\
+Inférence & $\times 20$ passes & $\times 5$ passes & \textbf{1 quantile} & \\
+Mémoire & $\times 1$ & $\times 5$ RAM & \textbf{cal. set} & \\
+Paramètres suppl. & 0 & $4\times$ nb params & \textbf{0} & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Décision et justification}
+
+\textbf{D2 : BiVAT adopte la Conformal Prediction post-hoc.} Justification :
+(1)~seule méthode avec garantie formelle de coverage distribution-free ; (2)~coût
+nul à l'entraînement, un quantile à l'inférence ; (3)~adaptations pour les
+contraintes BEAC : faible volume (SSBC, arXiv:2509.15349), déséquilibre des
+classes sous 1\% (CP class-conditional), non-stationnarité (EnbPI, Chen \&
+Xie 2021). MC Dropout est exclu pour overconfidence sur $N < 200$ ; Deep
+Ensembles pour coût mémoire $\times 5$ inadapté.
+
+\subsection{Choix D3  SHAP pour l'explicabilité}
+
+\subsubsection{Problème de décision}
+
+L'exigence d'auditabilité COBAC impose une attribution causale par indicateur IFS,
+reproductible et auditable. Trois familles de méthodes sont candidates.
+
+\subsubsection{Comparaison empirique}
+
+\begin{longtable}{p{3cm}p{3cm}p{3cm}p{3cm}p{3.5cm}}
+\caption{Comparaison SHAP, LIME, Integrated Gradients.}
+\label{tab:d3}\\
+\toprule
+\textbf{Critère} & \textbf{SHAP} & \textbf{LIME} &
+\textbf{Integr. Gradients} & \textbf{Source} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Critère} & \textbf{SHAP} & \textbf{LIME} &
+\textbf{Integr. Gradients} & \textbf{Source} \\
+\midrule
+\endhead
+\bottomrule\endlastfoot
+Stabilité & \textbf{1.00} & 0.20--0.81 & 0.97--0.99 &
+arXiv:2012.04218, Tables~2--3 \\
+\midrule
+Fidélité & \textbf{Élevée} (tabulaire) & Haute locale, diverge global &
+Haute (axiomes IG) &
+arXiv:2102.13076, Table~4 \\
+\midrule
+Accord inter-méthodes & \textbf{78\%} avec IG & 53\% avec SHAP/IG &
+78\% avec SHAP &
+Étude comparative 2021 \\
+\midrule
+Coût & DeepSHAP $\mathcal{O}(dT)$ ;
+KernelSHAP $\mathcal{O}(d^2)$ approché &
+$\mathcal{O}(K)$ perturbations &
+$\mathcal{O}(d \cdot \mathrm{steps})$ backward &
+ \\
+\midrule
+Compatibilité VAE/Transf. & DeepSHAP + KernelSHAP &
+Model-agnostique total &
+Natif (réseaux différentiables) &
+SHAPAttenVAE 2025 \\
+\midrule
+Réglementation bancaire & \textbf{ICAAP/CCAR} &
+Déconseillé (instabilité) &
+Acceptable &
+BIS FSI 2024 ; SHARC arXiv:2607.05484 \\
+\midrule
+Précédent état de l'art & \textbf{SHAPAttenVAE} (VAE+attn) &
+Aucun & Aucun &
+Zhang et al.\ 2025 \\
+\end{longtable}
+
+\subsubsection{Analyse de complexité pour $d = 55$}
+
+\begin{table}[ht]
+\centering
+\caption{Complexité des variantes SHAP pour BiVAT ($d=55$, $T=195$).}
+\label{tab:complexite-d3}
+\small
+\begin{tabular}{p{3.5cm}p{3.5cm}p{1.8cm}p{4.5cm}}
+\toprule
+\textbf{Variante} & \textbf{Complexité} &
+\textbf{Applicable} & \textbf{Remarque} \\
+\midrule
+KernelSHAP exact & $\mathcal{O}(2^{55})$ & Non &
+Intractable pour $d=55$ \\
+KernelSHAP approché & $\mathcal{O}(d^2) = \mathcal{O}(3\,025)$ & Oui &
+Approximation Shapley \\
+DeepSHAP & $\mathcal{O}(dT) = \mathcal{O}(10\,725)$ & \textbf{Oui} &
+Recommandé (VAE différentiable) \\
+Integrated Gradients & $\mathcal{O}(d \cdot \mathrm{steps})$ & \textbf{Oui} &
+Alternative rapide \\
+TreeSHAP & $\mathcal{O}(Td)$ & Non & Pas d'arbre dans BiVAT \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Références réglementaires}
+
+L'adoption de SHAP est motivée par les références institutionnelles suivantes :
+BIS FSI Paper (2024)  ``the lack of explainability of certain AI models can
+make it challenging for regulators to ascertain financial institutions' compliance
+with existing regulatory frameworks'' ; ECB Guide to Internal Models (2025,
+ML chapter)  SHAP et attention maps mentionnés comme outils acceptables ;
+PRA SS1/23 (2023)  model risk management, validation et gouvernance ML ;
+SHARC (arXiv:2607.05484)  SHAP explicitement utilisé pour ICAAP et CCAR ;
+BIS IFC Bulletin 57 (2022)  ML pour anomalies dans les données reportées ;
+IMF WP 2025/199  105 pays utilisant des suptech tools avec exigence
+d'explicabilité.
+
+\subsubsection{Décision et justification}
+
+\textbf{D3 : BiVAT adopte SHAP (DeepSHAP en production, KernelSHAP approché
+en fallback), avec perte de cohérence inter-couches inspirée de SHAPAttenVAE.}
+Justification : (1)~stabilité 1.00 vs 0.20--0.81 pour LIME, incompatible avec
+l'audit réglementaire reproductible ; (2)~seule méthode citée dans les processus
+ICAAP/CCAR et les rapports BIS FSI (2024) et ECB (2025) ; (3)~précédent direct
+sur VAE + attention (SHAPAttenVAE, Zhang et al.\ 2025) ; (4)~DeepSHAP à
+$\mathcal{O}(10\,725)$ opérations pour $d=55$, $T=195$ : coût négligeable en
+production mensuelle. LIME est exclu pour instabilité ; GradCAM est exclu car
+conçu pour les CNN.
+
+\subsection{Choix D4  Critère discriminant hybride reconstruction +
+Association Discrepancy}
+
+\subsubsection{Problème de décision}
+
+Le score d'anomalie de BiVAT doit combiner la richesse probabiliste du VAE et
+un critère discriminant global exploitant la structure temporelle.
+
+\subsubsection{Ablation study officielle}
+
+La Table~\ref{tab:d4-ablation} reproduit l'ablation study de Xu et al.\ (2022,
+ICLR, Table~3), justification quantitative centrale de ce choix.
+
+\begin{table}[ht]
+\centering
+\caption{Ablation study F1 (\%)  reconstruction vs AssDis vs hybride.
+Source : Xu et al.\ 2022, Table~3 (point adjustment).}
+\label{tab:d4-ablation}
+\small
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Critère} & \textbf{SMD} & \textbf{MSL} & \textbf{SMAP} &
+\textbf{SWaT} & \textbf{PSM} & \textbf{Moyenne} \\
+\midrule
+Reconstruction seule & 73.57 & 74.83 & 77.93 & 75.12 & 79.01 & 76.09 \\
+AssDis seule & 68.44 & 69.21 & 72.18 & 70.33 & 74.82 & 70.99 \\
+\textbf{Hybride (Recon + AssDis)} &
+\textbf{92.33} & \textbf{93.59} & \textbf{96.69} &
+\textbf{94.07} & \textbf{97.89} & \textbf{94.91} \\
+\midrule
+\textbf{Gain vs Recon} &
++18.76 & +18.76 & +18.76 & +18.95 & +18.88 & \textbf{+18.82} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Comparaison avec les alternatives}
+
+\begin{longtable}{p{4cm}p{2.5cm}p{2cm}p{2cm}p{4.5cm}}
+\caption{Comparaison des critères discriminants non supervisés.}
+\label{tab:d4-compare}\\
+\toprule
+\textbf{Méthode} & \textbf{Dataset} & \textbf{F1 (\%)} &
+\textbf{AUC} & \textbf{Source} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Méthode} & \textbf{Dataset} & \textbf{F1 (\%)} &
+\textbf{AUC} & \textbf{Source} \\
+\midrule
+\endhead
+\bottomrule\endlastfoot
+Reconstruction seule (VAE) & SMD & 73.57 & \nd &
+Xu et al.\ 2022, Table~3 \\
+Isolation Forest (espace latent) & Industriel multivarié & 0.12 $\pm$ 0.13 &
+\nd & arXiv:2604.13928, Table~III \\
+TCN-VAE (reconstruction) & Industriel & 96.80 & \nd &
+arXiv:2604.13928, Table~III \\
+\textbf{Hybride Recon + AssDis} & \textbf{SMD} & \textbf{92.33} & \nd &
+Xu et al.\ 2022, Table~1 \\
+MAAT (AssDis + Mamba) & SMD & 94.51 & \nd &
+arXiv:2502.07858, Table~1 \\
+\end{longtable}
+
+\subsubsection{Analyse de complexité computationnelle}
+
+\begin{table}[ht]
+\centering
+\caption{Complexité du critère discriminant hybride dans BiVAT.}
+\label{tab:complexite-d4}
+\small
+\begin{tabular}{p{4.5cm}p{3cm}p{5cm}}
+\toprule
+\textbf{Critère} & \textbf{Complexité} &
+\textbf{Surcoût vs reconstruction} \\
+\midrule
+Reconstruction MSE & $\mathcal{O}(d)$ & référence \\
+Reconstruction probabiliste VAE & $\mathcal{O}(d + z)$ & $+\mathcal{O}(z)$, négligeable \\
+Association Discrepancy & $\mathcal{O}(T^2)$ par couche &
+\textbf{0 surcoût} : dérivée des attention maps existantes \\
+\textbf{Hybride (produit)} & $\mathcal{O}(d + z + T^2)$ &
+\textbf{0 surcoût additionnel} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+L'Association Discrepancy est dérivée des matrices d'attention
+$\mathbf{A}^{(\ell)} \in \mathbb{R}^{T \times T}$ déjà calculées pendant le
+forward pass : le score hybride est computationnellement équivalent au score
+de reconstruction seul. L'Isolation Forest dans l'espace latent VAE est exclu
+car il opère par coupes hyperplanes aléatoires ne respectant pas la géométrie
+non-linéaire de l'espace latent : F1 = $0.12 \pm 0.13$ sur données industrielles
+multivariées contre 96.80\% pour TCN-VAE reconstruction (arXiv:2604.13928).
+
+\subsubsection{Décision et justification}
+
+\textbf{D4 : BiVAT adopte le critère discriminant hybride reconstruction
+probabiliste VAE + Association Discrepancy, avec stratégie minimax.} Justification :
+(1)~gain documenté de $+18{,}82$ points F1 moyen (ablation study Table~3,
+Xu et al.\ 2022) ; (2)~coût nul : AssDis extraite des attention maps existantes ;
+(3)~Isolation Forest latent exclu (F1 = 0.12 documenté) ; (4)~SVDD latent exclu
+faute de comparaison publiée sur les 5 datasets de référence.
+
+\subsection{Spécificités du Dataset BEAC Justifiant l'Ensemble des Choix}
+
+\begin{longtable}{p{3.2cm}p{3.5cm}p{3cm}p{5cm}}
+\caption{Spécificités des séries financières BEAC vs capteurs industriels.}
+\label{tab:beac-specs}\\
+\toprule
+\textbf{Caractéristique} & \textbf{Documentée dans} &
+\textbf{Impact} & \textbf{Adaptation BiVAT} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Caractéristique} & \textbf{Documentée dans} &
+\textbf{Impact} & \textbf{Adaptation BiVAT} \\
+\midrule
+\endhead
+\bottomrule\endlastfoot
+Non-stationnarité &
+Liu et al.\ 2022 NeurIPS ; CANDI arXiv:2604.01845 &
+Propriétés statistiques changeantes &
+CP pondéré ; RevIN \\
+\midrule
+Ruptures de régime &
+arXiv:2605.30363 ; Bai-Perron &
+COVID-19 2020--21, réformes CEMAC &
+SCS arXiv:2508.06638 \\
+\midrule
+Faible volume ($N=195$) &
+BIS IFC WP 23 (2023) ; Nakashima 2023 &
+Transformer pur sous-performant &
+BiLSTM (D1) ; SSBC (D2) \\
+\midrule
+Saisonnalité budgétaire &
+BIS IFC WP 23 (2023) &
+Pics décaissements CEMAC &
+STL pré-traitement ; PE calendaire \\
+\midrule
+Corrélations inter-séries &
+arXiv:2603.07864 ; ACM Survey 2024 &
+55 indicateurs IFS interdépendants &
+MHA cross-séries ; espace latent VAE \\
+\midrule
+Anomalies collectives &
+arXiv:2603.07864 &
+Chocs simultanés multi-indicateurs &
+Association Discrepancy (D4) \\
+\midrule
+Absence de labels &
+Universel en surveillance macroprud. &
+Anomalies connues a posteriori &
+Non supervisé + CP fausse alarme \\
+\end{longtable}
+
+La référence institutionnelle la plus proche est le BIS IFC Working Paper~23
+(2023, Banque Nationale de Malaisie) : ML non supervisé pour la détection
+d'anomalies dans des données trimestrielles agrégées d'institutions financières,
+avec modélisation explicite de la saisonnalité et validation sur $N \approx
+1\,079$ observations. Ce cas confirme la faisabilité de la démarche BiVAT dans
+un contexte institutionnel comparable à la BEAC.
+
+% ════════════════════════════════════════════════════════════════
+\section{Architecture BiVAT}
+
+\subsection{Vue d'ensemble}
+
+BiVAT (\textit{Bidirectional VAE-Associative Transformer}) est une architecture
+hybride profonde intégrant en un cadre unifié : un encodeur hybride Transformer
+bidirectionnel + BiLSTM, une projection variationnelle, un critère discriminant
+hybride reconstruction + Association Discrepancy, et un mécanisme d'explicabilité
+SHAP inter-couches. La Conformal Prediction est appliquée en post-traitement
+pour les intervalles de confiance.
+
+\subsection{Composante 1 : Encodeur hybride}
+
+Soit $\mathbf{X} \in \mathbb{R}^{T \times D}$ avec $T = 195$, $D = 55$.
+
+\textit{Étape 1  Embedding et encodage positionnel :}
+$$\mathbf{E}_t = \mathbf{W}_{\mathrm{emb}}\,\mathbf{x}_t + \mathrm{PE}(t)
+\in \mathbb{R}^{d_{\mathrm{model}}}$$
+
+$\mathrm{PE}(t)$ est l'encodage sinusoïdal enrichi de features calendaires
+(mois, trimestre) pour la saisonnalité CEMAC.
+
+\textit{Étape 2  BiLSTM bidirectionnel :}
+$$\overrightarrow{\mathbf{h}}_t = \mathrm{LSTM}_{\phi,\mathrm{fwd}}(
+\mathbf{E}_t,\,\overrightarrow{\mathbf{h}}_{t-1}), \quad
+\overleftarrow{\mathbf{h}}_t = \mathrm{LSTM}_{\phi,\mathrm{bwd}}(
+\mathbf{E}_t,\,\overleftarrow{\mathbf{h}}_{t+1}), \quad
+\mathbf{B}_t = \mathrm{Concat}(\overrightarrow{\mathbf{h}}_t,\,
+\overleftarrow{\mathbf{h}}_t)$$
+
+\textit{Étape 3  Transformer non causal ($L$ couches) :}
+$$\mathbf{H}^{(0)} = \mathbf{B}, \qquad
+\mathbf{H}^{(\ell)} = \mathrm{TransformerBlock}^{(\ell)}(\mathbf{H}^{(\ell-1)})$$
+
+Chaque bloc calcule simultanément Series Association et Prior Association :
+$$\mathcal{S}^{(\ell)} = \mathrm{Softmax}\!\left(
+\frac{\mathbf{Q}^{(\ell)}{\mathbf{K}^{(\ell)}}^\top}{\sqrt{d_k}}\right),
+\qquad
+\mathcal{P}^{(\ell)}_t(i) = \frac{1}{\sqrt{2\pi}\sigma^{(\ell)}}
+\exp\!\left(-\frac{(i-t)^2}{2(\sigma^{(\ell)})^2}\right)$$
+
+L'attention est non masquée : tout instant $t$ peut s'associer librement à tout
+$t' \in \{1, \ldots, T\}$.
+
+\subsection{Composante 2 : Projection variationnelle}
+
+$$\boldsymbol{\mu}_t = \mathbf{W}_\mu\,\mathbf{H}^{(L)}_t + \mathbf{b}_\mu,
+\qquad
+\log\boldsymbol{\sigma}^2_t = \mathbf{W}_\sigma\,\mathbf{H}^{(L)}_t +
+\mathbf{b}_\sigma, \qquad
+\mathbf{z}_t = \boldsymbol{\mu}_t + \boldsymbol{\sigma}_t \odot
+\boldsymbol{\epsilon}_t$$
+
+La distribution postérieure $q_\phi(\mathbf{z}_t|\mathbf{x}_{1:T})$ intègre
+l'information de toute la séquence (passé et futur) grâce à l'encodeur non
+causal, améliorant l'encodage aux instants de rupture.
+
+\subsection{Composante 3 : Décodeur et fonction objectif hybride}
+
+$$\hat{\mathbf{x}}_t = \mathrm{TransformerDecoder}_\theta(
+\mathbf{z}_t,\,\mathbf{H}^{(L)})$$
+
+\textbf{Fonction objectif hybride ELBO + Association Discrepancy :}
+
+$$\mathcal{L}_{\mathrm{BiVAT}} =
+\underbrace{\sum_{t=1}^T\!\left[
+\mathbb{E}_{q_\phi}[\log p_\theta(\mathbf{x}_t|\mathbf{z}_t)]
+- \beta_t\,D_{\mathrm{KL}}(q_\phi(\mathbf{z}_t|\mathbf{x}_{1:T})\,\|
+\,\mathcal{N}(\mathbf{0},\mathbf{I}))\right]}_{\text{ELBO variationnel (KL annealing)}}
+\;\mp\; \lambda \cdot
+\underbrace{\frac{1}{L}\sum_{\ell=1}^L
+\mathrm{AssDis}^{(\ell)}(\mathbf{X})}_{\text{Association Discrepancy}}$$
+
+\textit{Phase Maximize :}
+$\mathcal{L}^{\mathrm{max}} = \mathcal{L}_{\mathrm{ELBO}} -
+\lambda \cdot \mathrm{AssDis}(\mathbf{X})$
+
+\textit{Phase Minimize :}
+$\mathcal{L}^{\mathrm{min}} = \mathcal{L}_{\mathrm{ELBO}} +
+\lambda \cdot \mathrm{AssDis}(\mathbf{X})$
+
+\subsection{Composante 4 : Score d'anomalie multi-niveaux}
+
+\textbf{Score ponctuel probabiliste :}
+$$s^{\mathrm{point}}_t = -\frac{1}{K}\sum_{k=1}^K
+\log p_\theta(\mathbf{x}_t|\mathbf{z}_t^{(k)}) +
+\gamma\,D_{\mathrm{KL}}(q_\phi(\mathbf{z}_t|\mathbf{x}_{1:T})\,\|
+\,\mathcal{N}(\mathbf{0},\mathbf{I}))$$
+
+\textbf{Score discriminant intégré :}
+$$s^{\mathrm{discrim}}_t =
+\mathrm{Softmax}\!\left(-\mathrm{AssDis}^{(1:L)}_t\right) \cdot
+s^{\mathrm{point}}_t$$
+
+\textbf{Score contextuel :}
+$$s^{\mathrm{context}}_t = D_{\mathrm{KL}}\!\left(
+q_\phi(\mathbf{z}_t|\mathbf{x}_{1:T})\,\|
+\,p_\phi(\mathbf{z}_t|\mathbf{x}_{t-W:t+W})\right)$$
+
+\textbf{Score collectif :}
+$$s^{\mathrm{collect}}_{t:t+K} = \frac{1}{K}\sum_{k=0}^{K-1}
+s^{\mathrm{discrim}}_{t+k}$$
+
+\textbf{Intervalle de confiance par Conformal Prediction.} Sur un calibration
+set $\mathcal{C}$ de taille $n_c$ :
+$$\hat{q}_{1-\alpha} = \mathrm{Quantile}\!\left(
+\{s^{\mathrm{discrim}}_i\}_{i \in \mathcal{C}},\; 1-\alpha\right)$$
+
+$$\Pr\!\left(s^{\mathrm{discrim}}_t \leq \hat{q}_{1-\alpha}\right) \geq 1-\alpha$$
+
+La SSBC (arXiv:2509.15349) garantit la validité sur petit calibration set ; la
+CP pondérée ajuste les quantiles sous distribution shift.
+
+\subsection{Composante 5 : Explicabilité SHAP inter-couches}
+
+$$\boldsymbol{\alpha}^{(\ell)}_t =
+\mathrm{Softmax}(\mathbf{W}^{(\ell)}\,\mathbf{H}^{(\ell-1)}_t)
+\in \mathbb{R}^D, \qquad
+\phi_d(\mathbf{x}_t) = \sum_{S \subseteq \mathcal{D}\setminus\{d\}}
+\frac{|S|!\,(D-|S|-1)!}{D!}
+\left[s(\mathbf{x}_{S\cup\{d\}}) - s(\mathbf{x}_S)\right]$$
+
+$$\mathcal{L}_{\mathrm{expl}} = \sum_{t=1}^T
+\left\|\boldsymbol{\alpha}_t - \hat{\boldsymbol{\phi}}_t\right\|_2^2, \qquad
+\mathcal{L}^{\mathrm{final}}_{\mathrm{BiVAT}} =
+\mathcal{L}_{\mathrm{BiVAT}} + \mu\,\mathcal{L}_{\mathrm{expl}}$$
+
+\subsection{Récapitulatif architectural}
+
+\begin{table}[ht]
+\centering
+\caption{Récapitulatif des composantes de BiVAT et leurs justifications.}
+\label{tab:bivat-recap}
+\small
+\begin{tabular}{p{3cm}p{4cm}p{3.5cm}p{4cm}}
+\toprule
+\textbf{Composante} & \textbf{Décision} &
+\textbf{Gain documenté} & \textbf{Justification} \\
+\midrule
+Encodeur & Hybride Transf. bidir. + BiLSTM &
+Supérieur aux deux isolés &
+VLT-Anomaly T.3 ; VAEAT T.3 \\
+\midrule
+Incertitude & Conformal Prediction post-hoc &
+Garantie $\geq 1-\alpha$ ; SSBC &
+Vovk 2005 ; arXiv:2509.15349 \\
+\midrule
+Explicabilité & SHAP DeepSHAP inter-couches &
+Stabilité 1.00 vs 0.20--0.81 &
+BIS FSI 2024 ; ECB 2025 \\
+\midrule
+Critère discrim. & Recon. VAE + AssDis &
+$+18{,}82$ pts F1 moyen &
+Xu et al.\ 2022, Table~3 \\
+\midrule
+Score & Multi-niveaux (ponct./context./collect.) &
+Distinction types anomalies &
+Lacune L3 ; contexte BEAC \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ════════════════════════════════════════════════════════════════
+\section{Cohérence avec le Dataset BEAC-CEMAC}
+
+\subsection{Caractéristiques structurelles du dataset}
+
+Le dataset de référence  situation de l'actif/passif des Autres Sociétés de
+Dépôts (2SR) selon la nomenclature IFS  présente les caractéristiques
+suivantes : 195 observations mensuelles (décembre 2001 à mars 2026), 55
+indicateurs financiers en milliards de FCFA, valeurs manquantes sporadiques,
+hétérogénéité d'échelles, saisonnalité budgétaire annuelle marquée et ruptures
+structurelles documentées (COVID-19 2020--2021, croissance des actifs 2024).
+Ces caractéristiques correspondent aux sept spécificités documentées en
+Table~\ref{tab:beac-specs}.
+
+\subsection{Cohérence méthode par méthode}
+
+\textbf{VAE fondamental.} Applicable après stationnarisation avec normalisation
+z-score par série.
+
+\textbf{OmniAnomaly.} Directement applicable sur 55 séries et 195 pas de temps.
+Limite persistante : GRU codant mal les ruptures à plus de 12 mois.
+
+\textbf{Anomaly Transformer.} Association Discrepancy conceptuellement cohérente
+avec la surveillance monétaire. Pour $T = 195$, un modèle de taille modeste
+($L = 2$, $d_{\mathrm{model}} = 64$) est entraînable sur CPU standard.
+
+\textbf{T-VAE.} Très bien adapté en principe. Limite adressée dans BiVAT :
+l'encodeur causal ne peut pas exploiter l'information future, contrainte levée
+par l'encodeur bidirectionnel.
+
+\textbf{VAEAT.} La stratégie adversariale deux phases est adaptable pour les
+chocs exogènes COVID-19 non étiquetés du dataset BEAC.
+
+\textbf{SHAPAttenVAE.} Extrêmement adapté. L'explicabilité par indicateur IFS
+est directement exploitable par les équipes de surveillance.
+
+\textbf{BiVAT.} Cohérence maximale sur tous les axes : encodeur bidirectionnel
+pour l'audit a posteriori ; score multi-niveaux distinguant erreurs de collecte
+(ponctuelles), changements de comportement (contextuelles) et chocs
+macroéconomiques (collectives) ; intervalles CP calibrés pour $N = 195$ et les
+ruptures de régime ; SHAP satisfaisant les exigences COBAC.
+
+\subsection{Pipeline de prétraitement}
+
+(1)~\textit{Imputation} : interpolation linéaire pour lacunes courtes ($\leq 3$
+mois) ; MICE pour lacunes longues.
+
+(2)~\textit{Normalisation} : z-score par série sur la fenêtre d'entraînement
+(décembre 2001 à décembre 2019).
+
+(3)~\textit{Décomposition STL} : séparation tendance, saisonnalité (12 mois)
+et résidu. BiVAT est appliqué sur les résidus.
+
+(4)~\textit{Fenêtrage} : fenêtre glissante $W = 24$ mois, pas de 1 mois,
+produisant environ 171 fenêtres d'entraînement.
+
+(5)~\textit{Calibration CP} : 20\% des observations ($\approx 34$ fenêtres)
+réservées pour le calibration set, avec SSBC.
+
+% ════════════════════════════════════════════════════════════════
+\section{Conclusion}
+
+\subsection{Bilan de la revue de littérature}
+
+Ce document a présenté une analyse technique de treize travaux scientifiques
+couvrant les fondations du VAE, les architectures récurrentes-variationnelles,
+les Transformers spécialisés et les hybrides VAE-Transformer récents. L'analyse
+est outillée par un tableau de benchmarks normalisés sur cinq datasets (SMD,
+MSL, SMAP, SWaT, PSM) pour cinq modèles à résultats publics, et une matrice
+qualitative comparative sur dix critères. Les benchmarks confirment que la
+progression architecturale se traduit par des gains mesurables : OmniAnomaly
+(F1 moyen 84.69\%) $\rightarrow$ Anomaly Transformer (94.91\%) $\rightarrow$
+VAEAT (95.17\%) $\rightarrow$ MAAT (95.89\%).
+
+\subsection{Les quatre contributions architecturales de BiVAT}
+
+\textbf{D1  Encodeur hybride Transformer + BiLSTM.} Le Transformer seul est
+sous-performant de 25 à 60\% sur $N < 300$ (Nakashima 2023) ; le BiLSTM seul
+est supérieur sur séries financières courtes (MSE 0.408 vs 0.668) ; l'hybride
+est systématiquement supérieur aux deux composantes isolées (VLT-Anomaly,
+VAEAT).
+
+\textbf{D2  Conformal Prediction.} Seule garantie formelle de coverage
+distribution-free. MC Dropout exclu (overconfidence $N<200$) ; Deep Ensembles
+exclus (coût $\times 5$ RAM). Adaptations SSBC, CP class-conditional, EnbPI
+pour les contraintes BEAC.
+
+\textbf{D3  SHAP inter-couches.} Stabilité 1.00 vs 0.20--0.81 LIME ; seule
+méthode citée dans ICAAP/CCAR et rapports BIS FSI (2024) / ECB (2025) ;
+précédent SHAPAttenVAE (2025).
+
+\textbf{D4  Critère hybride reconstruction + AssDis.} Gain documenté de
+$+18{,}82$ points F1 moyen (ablation Table~3, Xu et al.\ 2022) ; coût
+computationnel nul car AssDis dérivée des attention maps existantes.
+
+\subsection{Perspectives de déploiement à la BEAC}
+
+BiVAT permettra de produire chaque mois un rapport structuré contenant :
+(a)~une liste ordonnée des observations anormales avec scores de confiance et
+intervalles CP ; (b)~une décomposition de la nature de chaque anomalie
+(ponctuelle / contextuelle / collective) ; (c)~une attribution dimensionnelle
+SHAP par indicateur IFS ; (d)~une recommandation de vérification calibrée selon
+le niveau de confiance. Ce dispositif, conforme aux exigences COBAC et ancré
+dans les recommandations BIS et FMI, constituerait le premier système de
+surveillance macroprudentielle basé sur une architecture hybride VAE-Transformer
+explicable et à incertitude formellement quantifiée déployé dans la zone CEMAC.
+
+% ════════════════════════════════════════════════════════════════
+\section*{Bibliographie}
+\addcontentsline{toc}{section}{Bibliographie}
+
+\begin{enumerate}
+
+\item[\lbrack F1\rbrack] Kingma, D.P., \& Welling, M. (2013).
+\textit{Auto-Encoding Variational Bayes}. arXiv:1312.6114.
+
+\item[\lbrack F2\rbrack] An, J., \& Cho, S. (2015).
+\textit{Variational Autoencoder Based Anomaly Detection Using Reconstruction
+Probability}. SNU Data Mining Center Technical Report.
+
+\item[\lbrack F3\rbrack] Su, Y., Zhao, Y., Niu, C., Liu, R., Sun, W., \&
+Pei, D. (2019). Robust Anomaly Detection for Multivariate Time Series through
+Stochastic Recurrent Neural Network. \textit{ACM SIGKDD}, pp.~2828--2837.
+DOI:~10.1145/3292500.3330672.
+
+\item[\lbrack T1\rbrack] Xu, J., Wu, H., Wang, J., \& Long, M. (2022).
+Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy.
+\textit{ICLR 2022 (Spotlight)}.
+\url{https://ise.thss.tsinghua.edu.cn/~mlong/doc/anomaly-transformer-iclr22.pdf}
+
+\item[\lbrack T2\rbrack] Tuli, S., Casale, G., \& Jennings, N.R. (2022).
+TranAD: Deep Transformer Networks for Anomaly Detection in Multivariate Time
+Series Data. \textit{PVLDB}, 15(6), 1201--1214. DOI:~10.14778/3514061.3514067.
+
+\item[\lbrack H1\rbrack] Song, A., Seo, E., \& Kim, H. (2023). Anomaly
+VAE-Transformer: A Deep Learning Approach for Anomaly Detection in
+Decentralized Finance. \textit{IEEE Access}, 11, 98115--98131.
+DOI:~10.1109/ACCESS.2023.3313448.
+
+\item[\lbrack H2\rbrack] Li, C., Kiat, Y.C., Jing, J., \& Long, C. (2025).
+T-VAE: Transformer-Based Variational AutoEncoder for Perceiving Anomalies in
+Multivariate Time Series Data. \textit{Expert Systems}, 42, e70078.
+DOI:~10.1111/exsy.70078.
+
+\item[\lbrack H3\rbrack] Wang, H., Pi, D., Zhang, X., Liu, H., \& Guo, C.
+(2022). Variational Transformer-based Anomaly Detection Approach for
+Multivariate Time Series. \textit{Measurement}, 191, 110791.
+DOI:~10.1016/j.measurement.2022.110791.
+
+\item[\lbrack H4\rbrack] Zhang, H., Xia, Y., Yan, T., \& Liu, G. (2021).
+Unsupervised Anomaly Detection in Multivariate Time Series through
+Transformer-based Variational Autoencoder. \textit{CCDC 2021}, pp.~281--286.
+
+\item[\lbrack A1\rbrack] He, X. et al. (2024). VAEAT: Variational AutoEncoder
+with Adversarial Training for Multivariate Time Series Anomaly Detection.
+\textit{Information Sciences}, 676, 120852. DOI:~10.1016/j.ins.2024.120852.
+
+\item[\lbrack A2\rbrack] Xie, B., Huo, Z., \& Zhang, C. (2025). Unsupervised
+Anomaly Detection in Time Series via Enhanced VAE-Transformer Framework.
+\textit{CMC}, 84(1), 843--860. DOI:~10.32604/cmc.2025.063151.
+
+\item[\lbrack A3\rbrack] Zhang, X., Wang, G., Chen, Y., Liu, Q., \& Wang, G.
+(2025). Inter-layer Explainable Variational Autoencoder for Multivariate Time
+Series Anomaly Detection (SHAPAttenVAE). \textit{Engineering Applications of
+Artificial Intelligence}, 159, 111585. DOI:~10.1016/j.engappai.2025.111585.
+
+\item[\lbrack A4\rbrack] Sellam, A.Z., Benaissa, I., Taleb-Ahmed, A.,
+Patrono, L., \& Distante, C. (2025). Mamba Adaptive Anomaly Transformer (MAAT).
+\textit{Engineering Applications of Artificial Intelligence}. arXiv:2502.07858.
+
+\item[] Vaswani, A. et al. (2017). Attention Is All You Need.
+\textit{NeurIPS}, 30, 5998--6008.
+
+\item[] Pang, G., Shen, C., Cao, L., \& Van Den Hengel, A. (2021). Deep
+Learning for Anomaly Detection: A Review. \textit{ACM Computing Surveys},
+54(2), 1--38.
+
+\item[] Vovk, V., Gammerman, A., \& Shafer, G. (2005).
+\textit{Algorithmic Learning in a Random World}. Springer.
+
+\item[] Gal, Y., \& Ghahramani, Z. (2016). Dropout as a Bayesian Approximation.
+\textit{ICML}, pp.~1050--1059.
+
+\item[] Lakshminarayanan, B., Pritzel, A., \& Blundell, C. (2017). Simple and
+Scalable Predictive Uncertainty Estimation using Deep Ensembles. \textit{NeurIPS}, 30.
+
+\item[] Lundberg, S.M., \& Lee, S.I. (2017). A Unified Approach to Interpreting
+Model Predictions. \textit{NeurIPS}, 30.
+
+\item[] Liu, Y., Wu, H., Wang, J., \& Long, M. (2022). Non-stationary
+Transformers. \textit{NeurIPS}, 35. arXiv:2205.14415.
+
+\item[] Chen, R., \& Xie, C. (2021). Conformal Prediction Intervals for Dynamic
+Time-Series. arXiv:2010.09107.
+
+\item[] Nakashima, K. et al. (2023). Benchmark Study on Anomaly Detection in
+Time Series. \textit{PHM Society Annual Conference}.
+
+\item[] BIS / IFC (2022). Machine learning applications in central banking.
+\textit{IFC Bulletin~57}.
+\url{https://www.bis.org/ifc/publ/ifcb57\_01\_rh.pdf}
+
+\item[] BIS / Banque Nationale de Malaisie (2023). Machine learning for anomaly
+detection in financial reporting. \textit{IFC Working Paper~23}.
+\url{https://www.bis.org/ifc/publ/ifcwork23.pdf}
+
+\item[] BIS (2024). Finding a needle in a haystack: ML for anomaly detection in
+payment systems. \textit{BIS Working Paper~1188}.
+\url{https://www.bis.org/ifc/publ/ifcb61\_26\_rh.pdf}
+
+\item[] BIS (2024). Central banks and AI. \textit{BIS Annual Economic Report
+2024, Chapter~3}.
+\url{https://www.bis.org/publ/arpdf/ar2024e3.pdf}
+
+\item[] BIS / FSI (2024). How regulators can address AI explainability.
+\url{https://www.bis.org/fsi/fsipapers24.pdf}
+
+\item[] ECB (2025). Guide to Internal Models (ML chapter).
+\url{https://www.bankingsupervision.europa.eu}
+
+\item[] PRA / Bank of England (2023). Model risk management principles for
+banks. \textit{Supervisory Statement SS1/23}.
+\url{https://www.bankofengland.co.uk/prudential-regulation/publication/2023}
+
+\item[] IMF (2025). AI Projects in Financial Supervisory Authorities.
+\textit{WP/25/199}.
+\url{https://www.imf.org/-/media/files/publications/wp/2025/english/wpiea2025199-source-pdf.pdf}
+
+\item[] Moukoko Ekambi, G.M. (2025). MKO-KAN : Détection de fraude Mobile Money
+par réseaux de Kolmogorov-Arnold hybrides en zone CEMAC. Rapport de stage,
+BEAC / ENSPD / Université de Douala, GISDIA Laboratory.
+
+\end{enumerate}
+
+\vspace{2cm}
+\hrule
+\vspace{0.5cm}
+\noindent{\small\textit{Document rédigé dans le cadre du stage de recherche à
+la Banque des États de l'Afrique Centrale (BEAC), M2 Data Science \& IA,
+ENSPD / Université de Douala  GISDIA Laboratory. Août 2026.}}
+
+\end{document}

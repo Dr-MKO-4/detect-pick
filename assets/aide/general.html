@@ -1,0 +1,21 @@
+<h2 style="color:#7a4f00">BEAC Anomaly Detector &mdash; Guide d&rsquo;utilisation</h2>
+<p>Cette application détecte les anomalies dans les agrégats monétaires des six pays membres
+de la CEMAC (Cameroun, Congo, Gabon, Guinée Équatoriale, RCA, Tchad) en s&rsquo;appuyant sur
+deux modèles complémentaires : <b>LOF*</b> et <b>BiVAT</b>.</p>
+
+<h3>Flux de travail recommandé</h3>
+<ol>
+  <li>Vérifiez la présence des fichiers de données (<b>Données</b> → icône verte).</li>
+  <li>Sélectionnez un pays et un volet (Actif / Passif) dans la barre de contrôle.</li>
+  <li>Choisissez le modèle <b>LOF*</b> et cliquez <b>Lancer l&rsquo;analyse</b>.</li>
+  <li>Parcourez les résultats par phase (boutons 1 → 2 → 3).</li>
+  <li>Pour l&rsquo;analyse BiVAT (Phase 4), sélectionnez <b>BiVAT</b> après avoir terminé LOF*.</li>
+  <li>Exportez le rapport via <i>Fichier → Exporter rapport HTML</i>.</li>
+</ol>
+
+<h3>Structure des données attendues</h3>
+<p>Les fichiers doivent être nommés selon le modèle :<br>
+<code>clean_{pays}_beac_mapping_2SR_{volet}.xlsx</code><br>
+et placés dans le dossier <code>data/</code>. Chaque fichier contient :<br>
+&bull; <b>195 observations</b> mensuelles (janv. 2001 &ndash; mars 2026)<br>
+&bull; <b>55 indicateurs</b> monétaires (masse monétaire, crédit, réserves, etc.)</p>

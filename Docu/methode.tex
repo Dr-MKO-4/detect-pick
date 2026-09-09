@@ -1,0 +1,730 @@
+\documentclass[12pt, a4paper]{article}
+
+% ─── Packages ─────────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath, amssymb}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{graphicx}
+\usepackage{cite}
+\usepackage{setspace}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+\onehalfspacing
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    citecolor=blue!60!black,
+    urlcolor=blue!60!black
+}
+
+% ─── En-tête ─────────────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\small Détection de variations atypiques par LOF  BEAC}
+\lhead{\small Méthodologie}
+\rfoot{\thepage}
+
+% ─── Titre ───────────────────────────────────────────────────────────────────
+\title{
+    \textbf{Méthodologie Modèle 1 : Détection d'Anomalies par LOF\\
+    sur les Données Monétaires BEAC}\\[0.3em]
+}
+\author{
+    \textbf{MOUKOKO EKAMBI GEORGES MIGUEL}\\[0.3em]
+    \textit{Stagiaire, Banque des États de l'Afrique Centrale}\\
+    \textit{Données sources : Banque des États de l'Afrique Centrale (BEAC)}
+}
+
+\date{\today}
+
+% ─── Document ────────────────────────────────────────────────────────────────
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Architecture du Pipeline Multi-fichiers}
+\label{sec:architecture}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Inventaire des sources de données}
+\label{subsec:inventaire}
+
+Le dossier de données contient douze fichiers au format XLSX, organisés selon
+la nomenclature
+\texttt{clean\_<pays>\_beac\_mapping\_2SR\_<Actif|Passif>.xlsx},
+et couvrant l'ensemble des six États membres de la CEMAC
+(tableau~\ref{tab:fichiers}).
+
+\begin{table}[htbp]
+    \centering
+    \caption{Fichiers sources disponibles par pays et par volet comptable.}
+    \label{tab:fichiers}
+    \begin{tabular}{lcc}
+        \toprule
+        \textbf{Pays} & \textbf{Actif} & \textbf{Passif} \\
+        \midrule
+        Cameroun            & $\checkmark$ & $\checkmark$ \\
+        Congo               & $\checkmark$ & $\checkmark$ \\
+        Gabon               & $\checkmark$ & $\checkmark$ \\
+        Guinée équatoriale  & $\checkmark$ & $\checkmark$ \\
+        RCA                 & $\checkmark$ & $\checkmark$ \\
+        Tchad               & $\checkmark$ & $\checkmark$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Chaque fichier partage la même structure formelle (format large, période
+mensuelle \texttt{AAAMyy}, indicateurs IFS), mais peut présenter des
+hétérogénéités de couverture temporelle et de taux de complétude selon
+le pays et le volet comptable. Les pays à système bancaire moins développé
+(RCA, Guinée équatoriale) présentent a priori des taux de valeurs manquantes
+supérieurs et des fenêtres temporelles plus courtes. Le pipeline est conçu
+pour s'adapter à ces variations sans intervention manuelle.
+
+\subsection{Choix du mode d'exécution : pipeline séparé}
+\label{subsec:mode_execution}
+
+Trois architectures d'exécution du LOF sont envisageables pour traiter
+l'ensemble de ces fichiers :
+
+\begin{enumerate}
+    \item \textbf{Mode séparé} : le pipeline complet (prétraitement,
+    décomposition, réduction, LOF) est exécuté indépendamment sur chacun
+    des douze fichiers. On obtient douze jeux de scores LOF, chacun mesurant
+    l'anormalité d'un mois \textit{relativement à la dynamique propre de
+    ce pays et de ce volet comptable}.
+
+    \item \textbf{Mode pool CEMAC} : les douze fichiers sont concaténés en
+    un unique jeu de données avant l'exécution du LOF. L'anormalité est
+    alors mesurée relativement à l'ensemble des observations de tous les pays,
+    sur les deux bilans simultanément.
+
+    \item \textbf{Mode hiérarchique} : combinaison des deux niveaux
+    précédents, avec agrégation des scores par pays puis synthèse au
+    niveau CEMAC.
+\end{enumerate}
+
+Nous retenons le mode séparé pour trois raisons complémentaires.
+
+\textit{Premièrement, la comparabilité inter-pays est structurellement
+inadéquate.}
+Les économies CEMAC présentent des structures bancaires très hétérogènes
+(taille du secteur financier, degré d'intermédiation, profondeur des marchés) :
+une même valeur absolue d'un agrégat peut être parfaitement normale au Cameroun
+et extrême en RCA. Concaténer les fichiers sans normalisation inter-pays
+préalable revient à mélanger des distributions incomparables dans un espace
+euclidien commun, ce qui génère des scores LOF mesurant l'écart à la moyenne
+CEMAC plutôt que l'anomalie propre à chaque pays.
+
+\textit{Deuxièmement, la calibration de MinPts serait invalidée.}
+Dans un pool CEMAC ($n \approx 195 \times 12 = 2\,340$), le paramètre
+$\text{MinPts}$ devrait être recalibré sur une base de données douze fois
+plus grande, et son interprétation en termes de \og{}cycles de
+référence\fg{} (section~\ref{sec:calibration}) perdrait son ancrage
+économique.
+
+\textit{Troisièmement, seul le mode séparé produit une interprétation
+économique directe.}
+Un score LOF élevé en avril~2020 au Cameroun doit être lu comme une anomalie
+dans la dynamique bancaire camerounaise, et non comme une position marginale
+dans un espace CEMAC composite qui mêle des régimes économiques sans lien
+causal.
+
+Le mode pool CEMAC est néanmoins conservé comme variante d'exploration pour
+la détection d'anomalies \textit{systémiques}, c'est-à-dire d'événements
+simultanément anormaux dans plusieurs pays
+(section~\ref{subsec:protocole_val}).
+
+\subsection{Cohérence comptable Actif--Passif}
+\label{subsec:actif_passif}
+
+L'identité fondamentale du bilan, $\text{Total Actif} = \text{Total Passif}$,
+constitue une contrainte comptable exploitable comme mécanisme de validation
+interne. Pour chaque pays, les scores LOF obtenus sur le fichier Actif seront
+confrontés à ceux obtenus sur le fichier Passif.
+
+Deux situations sont distinguées :
+\begin{itemize}
+    \item \textbf{Anomalie concordante} (signal sur Actif \textit{et} Passif
+    au même mois) : la déviation affecte la structure du bilan dans son
+    ensemble  c'est le signe d'un événement économique réel (choc de
+    crédit, assèchement de liquidités, crise systémique).
+    \item \textbf{Anomalie discordante} (signal sur un seul volet) :
+    suggère prioritairement une erreur de collecte, de saisie ou un problème
+    de réconciliation comptable entre les deux fichiers, plutôt qu'un
+    événement économique réel.
+\end{itemize}
+
+Cette distinction est intégrée au protocole de validation de la
+section~\ref{sec:validation}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Prétraitement et Mise en Forme des Données Monétaires}
+\label{sec:pretraitement}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Structure brute du dataset}
+\label{subsec:structure_brute}
+
+Les douze fichiers sources sont organisés en format large
+(\textit{wide format}) : chaque ligne représente un indicateur financier
+identifié par son code IFS, et chaque colonne correspond à une période
+mensuelle notée au format \texttt{AAAMyy}
+(ex.\ \texttt{2010M1}, \texttt{2024M12}).
+À l'inspection du fichier de référence (Cameroun Actif), la matrice de données
+couvre la période de décembre~2001 à mars~2026, soit environ $195$
+observations temporelles, pour $\approx 55$ indicateurs financiers répartis
+en grandes catégories d'actif : Numéraire et Dépôts, Titres, Crédits, Actions,
+Réserves Techniques d'Assurance, Autres Comptes à Recevoir et Crédits
+Commerciaux. Les valeurs sont exprimées en milliards de FCFA
+(Franc CFA de la CEMAC). Ces dimensions sont indicatives ; les autres fichiers
+peuvent présenter des couvertures temporelles et des nombres d'indicateurs
+différents, selon le pays et le volet comptable.
+
+\subsection{Anomalies structurelles et valeurs manquantes}
+\label{subsec:anomalies_struct}
+
+L'examen des fichiers sources révèle deux types de problèmes structurels
+distincts qu'il convient de traiter avant toute modélisation :
+
+\begin{enumerate}
+    \item \textbf{Valeurs \texttt{\#VALUE!}} : certaines cellules contiennent
+    des erreurs de calcul héritées des formules Excel sources
+    (ex.\ séries \textit{Numéraire et Dépôts}, \textit{Dépôts Transférables},
+    \textit{Crédits} sur les périodes \texttt{2012M7}--\texttt{2012M9} et
+    ponctuellement sur d'autres fenêtres). Ces entrées doivent être
+    considérées comme des valeurs manquantes (\texttt{NaN}) et traitées
+    par imputation.
+
+    \item \textbf{Cellules vides} : plusieurs indicateurs de sous-catégorie
+    présentent une première observation nulle ou absente pour la période
+    \texttt{2001M12}, correspondant à une couverture temporelle incomplète
+    en début de série.
+\end{enumerate}
+
+\subsection{Protocole de nettoyage}
+\label{subsec:protocole}
+
+La matrice des données est pivotée en format long (\textit{long format}),
+où chaque ligne représente un triplet (indicateur, période, valeur),
+facilitant les opérations d'imputation et de normalisation.
+Le protocole de nettoyage comporte deux étapes.
+
+\paragraph{Imputation des valeurs manquantes.}
+
+La stratégie d'imputation doit être adaptée au \textit{mécanisme de
+génération} des données manquantes, dont la nature conditionne la validité
+statistique des méthodes disponibles.
+
+\begin{itemize}
+    \item \textbf{Lacunes courtes internes (1 à 3 mois consécutifs).}
+    Ces lacunes, imputables aux erreurs de calcul Excel ou à des retards
+    de remontée, peuvent raisonnablement être supposées
+    \textit{Missing At Random} (MAR). L'\textbf{interpolation temporelle
+    linéaire} est appliquée : elle préserve la continuité locale de la
+    série sans introduire de biais structurel, en supposant une évolution
+    approximativement linéaire entre deux observations adjacentes connues.
+
+    \item \textbf{Lacunes étendues en milieu de série (plus de 3 mois
+    consécutifs).}
+    L'\textbf{algorithme MICE} (\textit{Multivariate Imputation by Chained
+    Equations}) est mobilisé \cite{vanbuuren2011mice}. Il exploite les
+    corrélations inter-séries pour inférer les valeurs absentes à partir de
+    l'information contenue dans les autres indicateurs du bilan, en itérant
+    des régressions conditionnelles sur chaque variable manquante. La validité
+    de MICE repose sur l'hypothèse MAR, raisonnable ici : les lacunes
+    résultent de défaillances de collecte liées à la période ou à
+    l'indicateur (observables), et non à la valeur non observée elle-même.
+
+    \item \textbf{Lacunes structurelles en début ou fin de série.}
+    Ces lacunes correspondent à des périodes antérieures au démarrage
+    effectif de la collecte d'un indicateur donné, phénomène fréquent en
+    RCA et en Guinée équatoriale. Elles sont de nature
+    \textit{Missing Not At Random} (MNAR). Appliquer MICE sur des données
+    MNAR introduit un biais d'imputation non contrôlé et potentiellement
+    sévère.
+    \textbf{Traitement retenu} : troncature de la fenêtre temporelle
+    d'analyse au premier mois effectivement renseigné pour la majorité des
+    indicateurs du fichier considéré. Les séries dont la part de valeurs
+    imputées en début de période dépasse $20\,\%$ de la fenêtre totale sont
+    exclues de la matrice d'entrée du LOF pour ce fichier.
+\end{itemize}
+
+\paragraph{Standardisation robuste par série (médiane\,/\,MAD).}
+
+Les $\approx 55$ indicateurs étant exprimés en milliards de FCFA mais
+présentant des ordres de grandeur très hétérogènes, une standardisation
+individuelle est impérative avant tout calcul de distance.
+
+\textbf{Pourquoi le Z-score classique est inadapté ici.}
+La standardisation usuelle $x^* = (x - \bar{x}) / \sigma$ utilise la moyenne
+$\bar{x}$ et l'écart-type $\sigma$, tous deux très sensibles aux valeurs
+extrêmes : un outlier prononcé gonfle simultanément $\bar{x}$ et $\sigma$,
+réduisant mécaniquement sa propre valeur normalisée. Il devient donc moins
+détectable après standardisation  précisément après l'étape censée préparer
+sa détection. Leys \textit{et al.}~\cite{leys2013mad} formalisent cette
+circularité et montrent sur données réelles que le Z-score peut masquer des
+anomalies que la standardisation robuste révèle.
+
+\textbf{Standardisation retenue : médiane\,/\,MAD.}
+Pour chaque série $i$, la transformation appliquée est :
+\[
+    x_{i,t}^* = \frac{x_{i,t} - \tilde{x}_i}
+                     {\kappa \cdot \operatorname{MAD}(x_i)}
+\]
+où $\tilde{x}_i = \operatorname{median}_t(x_{i,t})$ est la médiane
+temporelle,
+\[
+    \operatorname{MAD}(x_i) =
+    \operatorname{median}_t\!\bigl(\,|x_{i,t} - \tilde{x}_i|\,\bigr)
+\]
+est la déviation absolue médiane, et
+$\kappa = 1/\Phi^{-1}(0{,}75) \approx 1{,}4826$ est le facteur de cohérence
+rendant le MAD asymptotiquement équivalent à $\sigma$ sous distribution
+gaussienne \cite{leys2013mad}. La médiane possède un point de rupture de
+$50\,\%$ contre $0\,\%$ pour la moyenne, et le MAD hérite de cette propriété.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Décomposition et Stationnarisation des Séries Temporelles}
+\label{sec:decomposition}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Inadéquation du LOF sur séries brutes}
+\label{subsec:inadequation_lof}
+
+Le Local Outlier Factor, tel que formalisé par Breunig \textit{et al.}
+\cite{breunig2000lof}, opère dans un espace géométrique statique : il évalue
+la densité locale d'un point en fonction de ses distances aux $k$ plus proches
+voisins dans l'espace des descripteurs. Or, les agrégats monétaires du bilan
+2SR de la BEAC exhibent des tendances macroéconomiques prononcées sur la
+période 2001--2026 : par exemple, les crédits aux Autres Sociétés Non
+Financières ont progressé de près de $600\,\%$ en termes nominaux. En présence
+de telles tendances, la distance géométrique entre une observation de 2010 et
+une observation de 2024 intègre mécaniquement l'effet de la dérive temporelle,
+et non l'anomalie conjoncturelle recherchée.
+
+La même problématique s'applique à la saisonnalité : si les dépôts
+transférables présentent des pics récurrents en décembre (clôtures budgétaires)
+et des creux en janvier, un LOF appliqué aux données brutes qualifiera ces
+fluctuations saisonnières normales d'anomalies, faute de pouvoir les distinguer
+de déviations genuinement atypiques.
+
+\subsection{Décomposition STL}
+\label{subsec:stl}
+
+Pour isoler la composante résiduelle stationnaire sur laquelle le LOF sera
+exécuté, nous mobilisons la décomposition STL (\textit{Seasonal and Trend
+decomposition using Loess}), introduite par Cleveland \textit{et al.}
+\cite{cleveland1990stl}, qui décompose chaque série $x_{i,t}$ en trois
+composantes additives :
+\[
+    x_{i,t} = T_{i,t} + S_{i,t} + R_{i,t}
+\]
+où $T_{i,t}$ est la tendance estimée par régression locale (Loess),
+$S_{i,t}$ est la composante saisonnière mensuelle (période $= 12$),
+et $R_{i,t}$ est le résidu.
+
+Deux alternatives classiques auraient pu être retenues : la différenciation
+première et la méthode X-13~ARIMA-SEATS (standard des banques centrales).
+STL est préféré pour trois raisons : il s'adapte aux tendances non linéaires ;
+sa composante saisonnière est \textit{time-varying}, pertinente pour des séries
+dont la saisonnalité budgétaire peut évoluer avec les réformes fiscales CEMAC ;
+enfin, il est robuste aux outliers isolés via un schéma de pondération interne,
+ce qui évite que les anomalies recherchées biaisent l'estimation de la
+tendance.
+
+Seul le résidu $R_{i,t}$ est retenu comme entrée du LOF. Ce résidu représente
+les fluctuations inexpliquées par la dynamique normale de la série, et
+constitue donc le support naturel de la détection d'anomalies, conformément
+aux recommandations de l'état de l'art du projet \cite{moukoko2025etatart}.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Réduction de la Dimensionnalité}
+\label{sec:reduction}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Le fléau de la dimensionnalité}
+\label{subsec:fleau_dim}
+
+Avec $p \approx 55$ indicateurs financiers, l'espace résiduel dans lequel
+le LOF calcule ses distances est de dimension~55. Dans un espace de haute
+dimension, la distance euclidienne entre deux points tend vers la même valeur
+pour l'ensemble des paires de points (phénomène de concentration des
+distances), rendant le concept de \og{}plus proche voisin\fg{} de moins en
+moins discriminant à mesure que $p$ croît \cite{breunig2000lof}, Section~7.4.
+Ce phénomène est analysé de façon systématique par Zimek \textit{et al.}
+\cite{zimek2012survey}, qui montrent que la plupart des méthodes à base de
+densité locale, dont le LOF, dégénèrent en dimension supérieure à~20 sans
+réduction préalable.
+
+Dans le contexte du dataset BEAC, ce problème est amplifié par la redondance
+structurelle entre indicateurs : de nombreuses séries sont des composantes ou
+des sous-totaux d'agrégats de niveau supérieur (ex.\ \textit{Dépôts
+Transférables en MN} et ses sous-postes par contrepartie), induisant une
+forte collinéarité qui concentre la variance dans un sous-espace de faible
+dimension.
+
+\subsection{Stratégie de projection}
+\label{subsec:projection}
+
+\begin{enumerate}
+    \item \textbf{ACP Robuste (Robust PCA  RPCA).}
+    L'ACP classique est sensible aux outliers : ceux-ci exercent un effet de
+    levier sur les vecteurs propres, tirant les axes principaux vers eux et
+    biaisent la projection, si bien que les anomalies se retrouvent projetées
+    dans le sous-espace jugé \og{}normal\fg{}, réduisant leur visibilité dans
+    l'espace de calcul du LOF. Nous privilégions donc la RPCA, formalisée par
+    Candès \textit{et al.}~\cite{candes2011rpca}, qui décompose la matrice
+    $X \in \mathbb{R}^{n \times p}$ en une composante de bas rang $L$
+    (structure normale) et une composante creuse $S$ (anomalies) :
+    \[
+        X = L + S
+    \]
+    par la minimisation convexe :
+    \[
+        \min_{L,\,S} \; \|L\|_* + \lambda\|S\|_1
+        \quad \text{s.c.} \quad L + S = X
+    \]
+    où $\|\cdot\|_*$ est la norme nucléaire et $\|\cdot\|_1$ la norme
+    \textit{entrywise} $\ell_1$. Seule la composante $L$ est ensuite
+    projetée par ACP classique pour obtenir les $k$ premières composantes
+    principales, $k$ étant déterminé par le critère du coude et validé par
+    le pourcentage de variance expliquée cumulée (cible : $90\,\%$).
+
+    \item \textbf{UMAP} (\textit{Uniform Manifold Approximation and
+    Projection}) : méthode non linéaire réservée à la \textit{visualisation}
+    des scores LOF. Son usage est limité à l'exploration graphique : sa nature
+    non déterministe et la distorsion qu'il introduit dans les distances
+    globales le rendent inadapté comme espace de calcul du LOF dans un
+    contexte opérationnel où la reproductibilité est exigée.
+\end{enumerate}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Formalisation de la Densité Locale et du Facteur LOF}
+\label{sec:lof_formel}
+% ─────────────────────────────────────────────────────────────────────────────
+
+Cette section présente, dans leur enchaînement conceptuel formel,
+les définitions introduites par Breunig \textit{et al.}~\cite{breunig2000lof}
+qui fondent le calcul du facteur LOF.
+
+\subsection{\textit{k}-distance et voisinage}
+\label{subsec:kdistance}
+
+Pour un entier $k \geq 1$ et un point $p$ de l'espace des résidus normalisés,
+la \textbf{\textit{k}-distance} de $p$, notée $k\text{-distance}(p)$, est
+la distance $d(p, o)$ vers un objet $o$ tel qu'au moins $k$ objets
+$o' \neq p$ vérifient $d(p, o') \leq d(p, o)$ et au plus $k-1$ vérifient
+$d(p, o') < d(p, o)$ \cite{breunig2000lof}, Déf.~3.
+
+Le \textbf{voisinage de \textit{k}-distance} de $p$ est :
+\[
+    \mathcal{N}_k(p) = \bigl\{\, q \in \mathcal{D} \setminus \{p\}
+    \mid d(p, q) \leq k\text{-distance}(p) \,\bigr\}
+\]
+\cite{breunig2000lof}, Déf.~4. La cardinalité de $\mathcal{N}_k(p)$ peut
+être supérieure à $k$ en cas d'équidistance de plusieurs points.
+
+\subsection{Distance de joignabilité}
+\label{subsec:reachability}
+
+La \textbf{distance de joignabilité} de $p$ par rapport à $o$
+\cite{breunig2000lof}, Déf.~5, est :
+\[
+    \text{reach-dist}_k(p, o) = \max \bigl\{
+    k\text{-distance}(o),\; d(p, o)
+    \bigr\}
+\]
+Si $p$ est éloigné de $o$, la distance réelle $d(p,o)$ est retenue ;
+si $p$ est très proche de $o$, la distance est plafonnée à
+$k\text{-distance}(o)$, réduisant les fluctuations statistiques locales.
+
+\subsection{Densité locale de joignabilité}
+\label{subsec:lrd}
+
+La \textbf{densité locale de joignabilité} de $p$
+\cite{breunig2000lof}, Déf.~6, est :
+\[
+    \text{lrd}_k(p) = \left(
+    \frac{\displaystyle\sum_{o \in \mathcal{N}_k(p)}
+    \text{reach-dist}_k(p, o)}
+    {\left|\mathcal{N}_k(p)\right|}
+    \right)^{-1}
+\]
+Un $\text{lrd}_k(p)$ élevé indique que $p$ est situé dans une région dense,
+c'est-à-dire que son comportement mensuel est similaire à celui de plusieurs
+périodes voisines  un comportement normal dans le contexte BEAC.
+
+\subsection{Facteur d'anomalie local (LOF)}
+\label{subsec:lof_def}
+
+Le \textbf{facteur d'anomalie local} de $p$
+\cite{breunig2000lof}, Déf.~7, est :
+\[
+    \text{LOF}_k(p) =
+    \frac{\displaystyle\sum_{o \in \mathcal{N}_k(p)}
+    \dfrac{\text{lrd}_k(o)}{\text{lrd}_k(p)}}
+    {\left|\mathcal{N}_k(p)\right|}
+\]
+Un $\text{LOF}_k(p) \approx 1$ caractérise un point normal ; un
+$\text{LOF}_k(p) \gg 1$ signale une anomalie locale. Breunig \textit{et al.}
+établissent des bornes supérieure et inférieure générales sur ce facteur en
+fonction des distances de joignabilité directes et indirectes
+\cite{breunig2000lof}, Théorèmes~1 et~2. Appliqué au dataset BEAC, un mois
+$t$ recevra un $\text{LOF}_k$ élevé si son résidu est isolé dans l'espace
+réduit par RPCA, c'est-à-dire si ce mois constitue une déviation simultanée
+et atypique de plusieurs séries financières par rapport à leur comportement
+habituel.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Calibration Empirique du Paramètre \textit{MinPts}}
+\label{sec:calibration}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Non-monotonicité du LOF en fonction de \textit{MinPts}}
+\label{subsec:non_monotonicite}
+
+Le seul hyperparamètre du LOF est $\text{MinPts}$, qui fixe le nombre de
+voisins utilisé pour estimer la densité locale. Breunig \textit{et al.}
+\cite{breunig2000lof}, Section~6.1, démontrent que le score LOF n'évolue pas
+de manière monotone avec $\text{MinPts}$ : pour un même point, augmenter
+$\text{MinPts}$ peut alternativement augmenter, diminuer ou stabiliser son
+LOF, selon la structure locale du voisinage (Figure~7 de l'article de
+référence).
+
+\subsection{Stratégie de la plage de valeurs}
+\label{subsec:plage_valeurs}
+
+Pour pallier cette instabilité, Breunig \textit{et al.}
+\cite{breunig2000lof}, Section~6.2, proposent d'utiliser une plage de valeurs
+$[\text{MinPts}_\text{LB},\, \text{MinPts}_\text{UB}]$ et de retenir pour
+chaque point le score maximum :
+\[
+    \text{LOF}^*(p) = \max \bigl\{
+    \text{LOF}_{\text{MinPts}}(p) \mid
+    \text{MinPts}_\text{LB} \leq \text{MinPts} \leq \text{MinPts}_\text{UB}
+    \bigr\}
+\]
+Le maximum met en évidence l'instance à laquelle le point est le plus isolé,
+tandis que la moyenne diluerait ce caractère atypique et le minimum pourrait
+l'effacer complètement \cite{breunig2000lof}.
+
+\subsection{Détermination de la borne inférieure
+\textit{MinPts}$_\text{LB}$}
+\label{subsec:borne_inf}
+
+\begin{enumerate}
+    \item \textbf{Critère de stabilité statistique} : la règle pratique de
+    Breunig \textit{et al.}~\cite{breunig2000lof} est de fixer
+    $\text{MinPts}_\text{LB} \geq 10$ pour éliminer les fluctuations
+    statistiques indésirables. Avec $n \approx 195$, la valeur~10 représente
+    le 5\textsuperscript{e} percentile de la distribution des tailles de
+    voisinage.
+
+    \item \textbf{Critère de taille minimale de cluster} :
+    $\text{MinPts}_\text{LB}$ correspond au nombre minimal de mois
+    définissant un régime normal de référence. Une valeur de~12 est envisagée,
+    correspondant à un cycle annuel complet, cohérente avec la saisonnalité
+    budgétaire de la zone CEMAC.
+\end{enumerate}
+
+\subsection{Détermination de la borne supérieure
+\textit{MinPts}$_\text{UB}$}
+\label{subsec:borne_sup}
+
+$\text{MinPts}_\text{UB}$ représente la taille maximale d'un groupe de points
+pouvant être considéré comme un cluster d'anomalies locales
+\cite{breunig2000lof}. Nous proposons $\text{MinPts}_\text{UB} = 30$
+à~$40$, correspondant à 2 à 3 ans de données, motivés par la durée typique
+des cycles macroéconomiques CEMAC. La plage $[10, 30]$ sera validée par
+analyse de sensibilité.
+
+Pour tout fichier avec $n < 100$ observations effectives (RCA, Guinée
+équatoriale), la borne supérieure est ramenée à
+$\text{MinPts}_\text{UB} = \lfloor n/5 \rfloor$ afin de maintenir un rapport
+$\text{MinPts}/n$ cohérent avec les recommandations de l'article de référence.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Protocole de Validation et de Comparaison}
+\label{sec:validation}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\subsection{Contexte non supervisé : absence de labels}
+\label{subsec:contexte_ns}
+
+La détection d'anomalies dans le dataset BEAC est intrinsèquement non
+supervisée : il n'existe pas de labels historiques certifiés. Breunig
+\textit{et al.}~\cite{breunig2000lof}, Section~7, soulignent cette dimension
+exploratoire du LOF : il s'agit d'un outil de \textit{scoring} ordinal dont
+la valeur réside dans le classement relatif des observations, et non dans un
+seuil absolu.
+
+\subsection{Formalisation du seuil de détection $\tau$}
+\label{subsec:seuil}
+
+Le seuil $\tau$ est ancré dans la distribution empirique des scores
+LOF$^*$ \cite{kriegel2011outlier} via la règle de l'écart interquartile :
+\[
+    \tau = Q_3\!\bigl(\text{LOF}^*\bigr)
+    + 1{,}5 \times \operatorname{IQR}\!\bigl(\text{LOF}^*\bigr)
+\]
+où $Q_3$ est le troisième quartile et
+$\operatorname{IQR} = Q_3 - Q_1$ \cite{tukey1977eda}.
+Ce facteur est préféré au percentile fixe~95, dont la sensibilité dépend de
+la proportion d'anomalies réelles dans le dataset  inconnue a priori. En
+complément, le seuil au 95\textsuperscript{e} percentile est calculé comme
+variante de sensibilité. Les observations dépassant les deux seuils
+simultanément constituent les \textit{anomalies robustes} ; celles signalées
+par un seul seuil constituent les \textit{anomalies marginales} requérant
+une expertise domaine.
+
+\subsection{Protocole de validation proposé}
+\label{subsec:protocole_val}
+
+En l'absence de labels, le protocole de validation repose sur cinq niveaux
+complémentaires :
+
+\begin{enumerate}
+    \item \textbf{Analyse de sensibilité des scores LOF.}
+    Le profil $\text{LOF}_{\text{MinPts}}(t)$ est tracé pour
+    $\text{MinPts} \in [10, 30]$, en reproduisant la démarche de la
+    Figure~8 de \cite{breunig2000lof} sur les données BEAC. Les points
+    maintenant un LOF élevé sur toute la plage sont des anomalies robustes.
+
+    \item \textbf{Confrontation aux ruptures macroéconomiques.}
+    Les anomalies détectées ($\text{LOF}^* > \tau$, seuil défini à la
+    section~\ref{subsec:seuil}) sont confrontées aux événements documentés
+    dans la zone CEMAC : choc pétrolier (2014--2016), crise sécuritaire au
+    Cameroun (à partir de 2017), choc COVID-19 (2020--2021), dynamiques
+    post-pandémiques (2022--2024). Une concordance entre les anomalies
+    détectées et ces épisodes constitue une forme de validation externe
+    qualitative.
+
+    \item \textbf{Comparaison avec une baseline de distance globale.}
+    Le LOF est comparé à l'approche \textit{DB(pct, dmin)-outlier}
+    au sens de Knorr et Ng \cite{breunig2000lof}, Section~3, appliquée aux
+    mêmes résidus, afin de mettre en évidence les anomalies locales que le
+    LOF détecte et que l'approche globale manque, notamment les déviations
+    atypiques dans des régimes à densité variable
+    (ex.\ post-2020 vs pré-2015).
+
+    \item \textbf{Validation croisée inter-pays.}
+    Les douze jeux de scores LOF$^*$ sont superposés sur l'axe temporel.
+    Un mois $t$ est qualifié d'\textbf{anomalie systémique CEMAC} s'il
+    dépasse $\tau$ dans au moins $m \geq 3$ pays simultanément. Cette
+    procédure exploite une opportunité unique offerte par la structure
+    multi-fichiers et constitue une validation externe quantitative : les
+    anomalies systémiques devraient coïncider avec les chocs documentés
+    (crise pétrolière, COVID-19). À l'inverse, une anomalie détectée dans
+    un seul pays sur une période non documentée est plus vraisemblablement
+    liée à un problème de collecte local qu'à un événement économique réel.
+
+    \item \textbf{Cohérence Actif--Passif.}
+    Les scores LOF$^*$ des fichiers Actif et Passif sont comparés mois par
+    mois pour chaque pays. Les anomalies concordantes (signal sur les deux
+    volets) sont interprétées comme des événements économiques réels ; les
+    anomalies discordantes sont signalées comme suspectes et soumises à
+    vérification comptable (section~\ref{subsec:actif_passif}).
+\end{enumerate}
+
+\subsection{Présentation des résultats}
+\label{subsec:presentation}
+
+Les résultats seront présentés sous la forme d'une courbe de scores
+$\text{LOF}^*(t)$ en fonction du temps, superposée à la série brute de
+l'indicateur considéré, permettant d'associer visuellement chaque anomalie
+détectée à son contexte chronologique et économique. Un tableau récapitulatif
+identifiera les $N$ périodes les plus anomales (classées par $\text{LOF}^*$
+décroissant), avec pour chacune le ou les indicateurs du bilan portant la
+déviation principale, une interprétation économique proposée, et la mention
+de sa concordance inter-pays et inter-bilans.
+
+% ═════════════════════════════════════════════════════════════════════════════
+% NOUVELLES RÉFÉRENCES BIBLIOGRAPHIQUES
+%
+% Ces entrées sont à FUSIONNER avec le \begin{thebibliography}{99} du document
+% maître (ou à ajouter dans le fichier .bib si la compilation utilise BibTeX).
+% Elles correspondent aux sept sources mobilisées dans ce fichier qui ne
+% figurent pas encore dans la bibliographie de l'état de l'art.
+% ═════════════════════════════════════════════════════════════════════════════
+
+\bibliographystyle{plain}
+\begin{thebibliography}{99}
+
+% ─── Référence principale (LOF) ───────────────────────────────────────────────
+\bibitem{breunig2000lof}
+Breunig, M.M., Kriegel, H.-P., Ng, R.T., \& Sander, J. (2000).
+\textit{LOF: Identifying Density-Based Local Outliers}.
+Proceedings of the 2000 ACM SIGMOD International Conference on
+Management of Data, pp.~93--104.
+\url{https://doi.org/10.1145/342009.335388}
+
+% ─── Document compagnon du projet ─────────────────────────────────────────────
+\bibitem{moukoko2025etatart}
+Moukoko~Ekambi, G.M. (2025).
+\textit{Détection de Variations Atypiques dans les Séries Temporelles
+Financières par l'Intelligence Artificielle : État de l'Art}.
+Rapport de stage, Banque des États de l'Afrique Centrale (BEAC).
+ENSPD / Université de Douala, LIDIA Laboratory.
+
+% ─── Références méthodologiques nouvelles ─────────────────────────────────────
+\bibitem{cleveland1990stl}
+Cleveland, R.B., Cleveland, W.S., McRae, J.E., \& Terpenning, I. (1990).
+\textit{STL: A Seasonal-Trend Decomposition Procedure Based on Loess}.
+Journal of Official Statistics, \textbf{6}(1), 3--73.
+
+\bibitem{vanbuuren2011mice}
+Van~Buuren, S., \& Groothuis-Oudshoorn, K. (2011).
+\textit{mice: Multivariate Imputation by Chained Equations in R}.
+Journal of Statistical Software, \textbf{45}(3), 1--67.
+\url{https://doi.org/10.18637/jss.v045.i03}
+
+\bibitem{leys2013mad}
+Leys, C., Ley, C., Klein, O., Bernard, P., \& Licata, L. (2013).
+\textit{Detecting outliers: Do not use standard deviation around the mean,
+use absolute deviation around the median}.
+Journal of Experimental Social Psychology, \textbf{49}(4), 764--766.
+\url{https://doi.org/10.1016/j.jesp.2013.03.013}
+
+\bibitem{zimek2012survey}
+Zimek, A., Schubert, E., \& Kriegel, H.-P. (2012).
+\textit{A survey on unsupervised outlier detection in high-dimensional
+numerical data}.
+Statistical Analysis and Data Mining, \textbf{5}(5), 363--387.
+\url{https://doi.org/10.1002/sam.11161}
+
+\bibitem{candes2011rpca}
+Cand\`{e}s, E.J., Li, X., Ma, Y., \& Wright, J. (2011).
+\textit{Robust Principal Component Analysis?}
+Journal of the ACM, \textbf{58}(3), Article~11.
+\url{https://doi.org/10.1145/1970392.1970395}
+
+\bibitem{kriegel2011outlier}
+Kriegel, H.-P., Kr\"{o}ger, P., Schubert, E., \& Zimek, A. (2011).
+\textit{Interpreting and Unifying Outlier Scores}.
+Proceedings of the 2011 SIAM International Conference on Data Mining
+(SDM 2011), pp.~13--24.
+\url{https://doi.org/10.1137/1.9781611972818.2}
+
+\bibitem{tukey1977eda}
+Tukey, J.W. (1977).
+\textit{Exploratory Data Analysis}.
+Addison-Wesley, Reading (MA).
+
+\end{thebibliography}
+
+\end{document}

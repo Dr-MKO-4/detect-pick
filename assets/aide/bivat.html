@@ -1,0 +1,49 @@
+<h2 style="color:#7a4f00">Pipeline BiVAT</h2>
+<p><b>Prérequis</b> : le pipeline LOF* doit avoir été exécuté pour le même pays/volet.</p>
+
+<h3>Architecture du modèle</h3>
+<ul>
+  <li><b>Encodeur BiTransformer</b> : deux passes Transformer (forward + backward) dont les sorties
+  sont concaténées et projetées &rarr; capture les dépendances temporelles bidirectionnelles.</li>
+  <li><b>BiLSTM Bridge</b> : raffine la représentation temporelle avant le décodeur.</li>
+  <li><b>VAE</b> (Variational Autoencoder) : encode la séquence en espace latent gaussien (&mu;, &sigma;&sup2;)
+  &rarr; objective ELBO = reconstruction + &beta;&middot;KL.</li>
+  <li><b>TransformerDecoder</b> : reconstruit la séquence à partir du vecteur latent.</li>
+</ul>
+
+<h3>Score discriminant s_discrim</h3>
+<p>s_discrim(t) = MSE de reconstruction &times; Association Discrepancy (AD)<br>
+L&rsquo;AD mesure la divergence KL symétrique entre la distribution d&rsquo;attention A et une prior gaussienne Q
+centrée sur chaque token. Une fenêtre anomale présente une haute reconstruction error ET
+une forte déviation de la prior (concentration d&rsquo;attention sur des points distants).</p>
+
+<h3>Prédiction conforme (CP)</h3>
+<p><b>SSBC</b> (Split Conformal + Bootstrap Calibration) : garantit Pr(s &le; q&#x0302;&rsquo;&#x2080;&period;&#x2085;&rsquo;) &ge; 95%
+sur données de calibration (2020&ndash;2022). Adapté aux petits ensembles (n &lt; 200).<br>
+<b>EnbPI</b> : intervalles conformaux rolling (fenêtre 24 mois) sur la période de test.
+Permet de détecter des ruptures de régime (COVID, chocs externes).</p>
+
+<h3>Phase 2 &mdash; Calibration BiVAT</h3>
+<table border="0" cellpadding="4">
+<tr><td><b>Fig. E</b></td><td>Score BiVAT + enveloppes CP 90/95% sur fenêtre de calibration<br>
+<small>Couverture cible &ge; 90%. Un score &gt; q&#x0302;&rsquo;&#x2080;&period;&#x2089;&rsquo; signale une anomalie.</small></td></tr>
+</table>
+
+<h3>Phase 4 &mdash; Comparaison inter-modèles</h3>
+<table border="0" cellpadding="4">
+<tr><td><b>Fig. D</b></td><td>LOF*_norm vs s_discrim_norm [0,1] &mdash; 4 zones de concordance</td></tr>
+<tr><td><b>Fig. E bis</b></td><td>Score BiVAT rolling sur la fenêtre de test (bande COVID grisée)</td></tr>
+<tr><td><b>Fig. F</b></td><td>Bar chart SHAP : top-5 indicateurs contributeurs aux anomalies BiVAT</td></tr>
+<tr><td><b>Fig. G</b></td><td>Heatmap 6 pays &times; 4 types d&rsquo;anomalie (Ponctuelle / Contextuelle /
+Collective / Systémique)</td></tr>
+</table>
+
+<h3>Score hybride (Spec &sect;5)</h3>
+<p>s_hybrid(t) = 0.5 &middot; LOF*_norm(t) + 0.5 &middot; s_discrim_norm(t)<br>
+Combine les deux détecteurs après normalisation min-max. Stocké dans les résultats BiVAT
+mais non encore affiché séparément &mdash; prévu dans une prochaine version.</p>
+
+<h3>SHAP (Explainability)</h3>
+<p>DeepExplainer calcule les valeurs de Shapley pour les top anomalies BiVAT.
+Le background est constitué de 50 fenêtres normales (score &le; Q75 du training).
+Les valeurs SHAP indiquent la contribution de chaque indicateur à l&rsquo;anomalie détectée.</p>

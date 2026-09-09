@@ -1,0 +1,40 @@
+<h2 style="color:#7a4f00">Pipeline LOF*</h2>
+
+<h3>Phase 1 &mdash; Prétraitement</h3>
+<table border="0" cellpadding="4">
+<tr><td><b>Fig. 1</b></td><td>Carte des données manquantes (NaN par indicateur &times; mois)</td></tr>
+<tr><td><b>Fig. 2</b></td><td>Heatmap des corrélations des résidus STL</td></tr>
+<tr><td><b>Fig. 3</b></td><td>Décomposition STL : tendance + saisonnalité + résidu (4 panneaux)</td></tr>
+<tr><td><b>Fig. A</b></td><td>Variance RPCA sur fenêtres glissantes (stabilité du signal)</td></tr>
+</table>
+<p><b>Imputation</b> : valeurs manquantes comblées par MICE (régression itérée, 10 iter max,
+arrêt si &Delta; &lt; 1e-4). Standardisation MAD (robuste aux outliers).</p>
+<p><b>Décomposition STL</b> : décomposition saisonnière-tendancielle Loess (période = 12 mois,
+<code>robust=True</code>). Le résidu R<sub>i,t</sub> est la composante analysée par LOF*.</p>
+<p><b>RPCA</b> (Robust PCA) : sépare la matrice en composante de faible rang (tendance commune)
+et composante parcimonieuse (signaux aberrants locaux).</p>
+
+<h3>Phase 2 &mdash; Calibration LOF*</h3>
+<table border="0" cellpadding="4">
+<tr><td><b>Fig. 4</b></td><td>Scree plot RPCA : variance expliquée par composante</td></tr>
+<tr><td><b>Fig. 5</b></td><td>Biplot ACP : projection des observations et des indicateurs</td></tr>
+<tr><td><b>Fig. 6</b></td><td>Projection UMAP 2D (non-linéaire) &mdash; clusters naturels</td></tr>
+<tr><td><b>Fig. 7</b></td><td>Profils LOF(MinPts) pour les 20 observations les plus anormales</td></tr>
+<tr><td><b>Fig. 8</b></td><td>Distribution des scores LOF* + seuil &tau;</td></tr>
+</table>
+<p><b>LOF*</b> = max<sub>MinPts &isin; [10,30]</sub> LOF<sub>k</sub>(p)<br>
+Le maximum sur la plage de MinPts rend le score robuste au choix du paramètre k.</p>
+<p><b>Seuil &tau;</b> = Q3 + 1,5 &times; IQR (règle de Tukey 1977). Un score LOF* &gt; &tau; signale une anomalie.</p>
+
+<h3>Phase 3 &mdash; Résultats LOF*</h3>
+<table border="0" cellpadding="4">
+<tr><td><b>Fig. 9</b></td><td>Boxplot des scores LOF* par année &mdash; saisonnalité des anomalies</td></tr>
+<tr><td><b>Fig. 10</b></td><td>Série temporelle LOF* avec seuil &tau; (dropdown tous pays/volets)</td></tr>
+<tr><td><b>Fig. 11</b></td><td>Superposition LOF* + résidu + données brutes</td></tr>
+<tr><td><b>Fig. 12</b></td><td>Bar chart horizontal des indicateurs contributeurs aux anomalies</td></tr>
+<tr><td><b>Fig. 13</b></td><td>Heatmap mois &times; indicateurs (clustering hiérarchique Ward)</td></tr>
+<tr><td><b>Fig. 14</b></td><td>Heatmap inter-pays + panneau &laquo; nombre de pays en alerte simultanée &raquo;</td></tr>
+<tr><td><b>Fig. B</b></td><td>Concordance Actif / Passif (disponible après analyse des deux volets)</td></tr>
+</table>
+<p><b>Anomalie systémique</b> : un mois est considéré systémique si &ge; 3 pays dépassent simultanément
+leur seuil national &tau;. Ligne pointillée rouge dans Fig. 14.</p>
