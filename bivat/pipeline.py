@@ -274,10 +274,20 @@ class PipelineBiVAT:
             logger.info("[BIVAT] >>> Étape SHAP explainability (top-%d anomalies)", C.SHAP_TOP_N)
             t_shap = time.time()
             try:
+                # Fenêtre de test uniquement (spec graphique.tex §Fig. F : "les
+                # cinq mois les plus anomaux selon BiVAT sur la fenêtre de
+                # test"). Utiliser np.concatenate([scores_train, scores_cal,
+                # scores_test]) avec X_full était incorrect : X_cal réutilise
+                # la fin de X_train quand la fenêtre de calibration est trop
+                # courte (cf. section "Split" ci-dessus), donc les positions
+                # du tableau concaténé ne correspondent plus aux positions
+                # chronologiques de X_full au-delà de la frontière train/cal —
+                # ce qui décalait top_t et cassait le calcul des dates/scores
+                # dans figF_shap_top_anomalies (bivat/graphiques.py).
                 self.shap_results = explain_top_anomalies(
                     self.model,
-                    X_full,
-                    np.concatenate([self.scores_train, self.scores_cal, self.scores_test]),
+                    X_test,
+                    self.scores_test,
                     self.feature_names,
                     window=window,
                 )
@@ -286,7 +296,7 @@ class PipelineBiVAT:
                 if log_callback:
                     log_callback(f"[BIVAT] SHAP calculé pour top-{C.SHAP_TOP_N} anomalies ({elapsed_shap:.0f}s)")
             except Exception as e:
-                logger.warning("[BIVAT] SHAP échoué (shap non installé ?) : %s", e)
+                logger.warning("[BIVAT] SHAP échoué : %s", e, exc_info=True)
                 self.shap_results = None
         else:
             logger.info("[BIVAT] SHAP explainability sautée (compute_shap=False)")

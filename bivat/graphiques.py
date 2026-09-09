@@ -390,8 +390,11 @@ class BiVATGraphiques:
             subplot_titles=[f"Anomalie {i+1}" for i in range(n_anom)],
         )
 
+        # t_idx (top_t) indexe directement scores_test / dates_test : le SHAP
+        # est calculé sur la fenêtre de test uniquement (bivat/pipeline.py).
         for i in range(n_anom):
             t_idx = top_t[i]
+            test_idx = t_idx
             ind   = top_ind[i]
             sv    = shap_signed[i] if i < len(shap_signed) else ind["shap"]
 
@@ -403,17 +406,21 @@ class BiVATGraphiques:
             colors   = [RED if v > 0 else BLUE for v in x_vals]
 
             # Score info
-            bivat_sc = float(sc_test[t_idx]) if t_idx < len(sc_test) else float("nan")
-            lof_sc   = float("nan")
-            if lof_scores_test is not None and t_idx < len(lof_scores_test):
+            bivat_sc = (float(sc_test[test_idx])
+                        if 0 <= test_idx < len(sc_test) else float("nan"))
+
+            # Date label (avant lof_sc, qui s'appuie dessus pour indexer par date)
+            date_val = (p.dates_test[test_idx]
+                        if p.dates_test is not None and 0 <= test_idx < len(p.dates_test)
+                        else None)
+            date_str = str(date_val)[:7] if date_val is not None else f"t={t_idx}"
+
+            lof_sc = float("nan")
+            if lof_scores_test is not None and date_val is not None:
                 try:
-                    lof_sc = float(lof_scores_test.iloc[t_idx])
+                    lof_sc = float(lof_scores_test.loc[date_val])
                 except Exception:
                     pass
-
-            # Date label
-            date_str = str(p.dates_test[t_idx - (len(sc_test) - len(p.dates_test))])[:7] \
-                       if p.dates_test is not None else f"t={t_idx}"
 
             # Update subplot title
             fig.layout.annotations[i].text = (

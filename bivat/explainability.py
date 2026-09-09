@@ -1,4 +1,4 @@
-"""BiVAT explainability  SHAP DeepExplainer (SPEC §4.1 D3).
+"""BiVAT explainability  SHAP GradientExplainer (SPEC §4.1 D3).
 
 Computes DeepSHAP attributions φ_d(x_t) per indicator d at anomalous month t.
 Complexity: O(d·T) = O(55 × 195) ≈ 10 725  tractable on CPU.
@@ -32,13 +32,16 @@ class _BiVATWrapper(torch.nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = self.model(x)
-        # Return per-sample MSE reconstruction error (B,)
-        return torch.nn.functional.mse_loss(out["x_hat"], x, reduction="none").mean(dim=[1, 2])
+        # Per-sample MSE reconstruction error, shape (B, 1) — shap.GradientExplainer
+        # indexe la sortie comme (B, n_outputs) ; un vecteur (B,) plat fait
+        # planter cette indexation ("too many indices for tensor of dimension 1").
+        mse = torch.nn.functional.mse_loss(out["x_hat"], x, reduction="none").mean(dim=[1, 2])
+        return mse.unsqueeze(-1)
 
 
 class BiVATExplainer:
     """
-    SHAP DeepExplainer wrapper for BiVAT.
+    SHAP GradientExplainer wrapper for BiVAT.
 
     Parameters
     ----------
@@ -48,10 +51,9 @@ class BiVATExplainer:
 
     def __init__(self, model: BiVAT, X_background: np.ndarray):
         try:
-            import shap
+            import shap as _shap
         except ImportError:
             raise ImportError("shap is required: pip install shap")
-        import shap as _shap
 
         model.eval()
         model.to(DEVICE)
@@ -59,7 +61,13 @@ class BiVATExplainer:
         self.wrapper = _BiVATWrapper(model).to(DEVICE)
 
         bg = torch.tensor(X_background, dtype=torch.float32).to(DEVICE)
-        self.explainer = _shap.DeepExplainer(self.wrapper, bg)
+        # GradientExplainer plutôt que DeepExplainer : le backend PyTorch de
+        # DeepExplainer s'appuie sur des hooks d'autograd qui ne suivent plus
+        # les versions récentes de PyTorch pour une architecture avec
+        # Transformer/BiLSTM (échec observé : "tuple index out of range" dès
+        # l'initialisation). GradientExplainer (expected gradients) reste
+        # compatible et convient à ce type d'architecture.
+        self.explainer = _shap.GradientExplainer(self.wrapper, bg)
 
     def explain(self, X_windows: np.ndarray) -> np.ndarray:
         """
@@ -74,7 +82,7 @@ class BiVATExplainer:
         shap_vals : (n_anom, window, d)   signed attributions
         """
         import time as _time
-        logger.info("[SHAP] DeepExplainer.shap_values  %d fenêtres anormales (%d×%d×%d)",
+        logger.info("[SHAP] GradientExplainer.shap_values  %d fenêtres anormales (%d×%d×%d)",
                     X_windows.shape[0], *X_windows.shape)
         t0 = _time.time()
         t = torch.tensor(X_windows, dtype=torch.float32).to(DEVICE)
@@ -83,6 +91,11 @@ class BiVATExplainer:
         if isinstance(sv, list):
             sv = sv[0]
         sv = np.array(sv)
+        # La sortie du wrapper est (B, 1) → GradientExplainer ajoute une
+        # dimension finale de taille 1 (n_anom, window, d, 1) : la retirer
+        # pour retrouver la forme attendue (n_anom, window, d).
+        if sv.ndim == 4 and sv.shape[-1] == 1:
+            sv = sv[..., 0]
         logger.info("[SHAP] shap_values calculées en %.1fs  shape=%s  |φ|_max=%.4f  |φ|_moy=%.5f",
                     _time.time() - t0, sv.shape,
                     float(np.abs(sv).max()), float(np.abs(sv).mean()))
@@ -192,10 +205,10 @@ def explain_top_anomalies(
     logger.info("[SHAP] Jeu de référence (background) : %d fenêtres normales (p75 score = %.4f)",
                 n_bg_eff, float(score_p75))
 
-    logger.info("[SHAP] Initialisation DeepExplainer…")
+    logger.info("[SHAP] Initialisation GradientExplainer…")
     t0_expl = _time.time()
     explainer  = BiVATExplainer(model, X_bg)
-    logger.info("[SHAP] DeepExplainer initialisé en %.1fs", _time.time() - t0_expl)
+    logger.info("[SHAP] GradientExplainer initialisé en %.1fs", _time.time() - t0_expl)
 
     shap_vals  = explainer.explain(X_anomalies)              # (n_top, window, d)
     shap_agg   = BiVATExplainer.aggregate_over_window(shap_vals)  # (n_top, d)
