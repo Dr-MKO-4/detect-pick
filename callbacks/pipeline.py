@@ -13,7 +13,7 @@ from database import models, close_connection
 # Incrémenter cette version invalide immédiatement tous les caches existants —
 # à faire chaque fois que la logique du pipeline LOF (beac_lof/) change de
 # façon à modifier les résultats produits pour des hyperparamètres identiques.
-PIPELINE_CACHE_VERSION = "v1"
+PIPELINE_CACHE_VERSION = "v2"  # v1→v2 : fig10 (animate=False), axes date, libellés indicateurs
 
 
 def _lof_cache_key(pays: str, volet: str) -> str | None:
@@ -293,7 +293,7 @@ def start_pipeline(n, pays, volet, modele, auth):
                 # Phase 1 (résultats clés) générée en priorité pour affichage immédiat
                 priority_tasks = [
                     ("fig9",  lambda: g.fig9_boxplot_lof_annee(pays, volet)),
-                    ("fig10", lambda: g.fig10_serie_temporelle_lof(pays, volet)),
+                    ("fig10", lambda: g.fig10_serie_temporelle_lof(pays, volet, animate=False)),
                     ("fig12", lambda: g.fig12_bar_chart_indicateurs(pays, volet)),
                     ("fig13", lambda: g.fig13_heatmap_anomalies(pays, volet)),
                     ("fig8",  lambda: g.fig8_distribution_lof(pays, volet)),
@@ -626,7 +626,7 @@ def start_bivat_pipeline(n, pays, volet, modele, auth):
                         # Figures prioritaires uniquement
                         priority = [
                             ("fig9",  lambda: g.fig9_boxplot_lof_annee(pays, volet)),
-                            ("fig10", lambda: g.fig10_serie_temporelle_lof(pays, volet)),
+                            ("fig10", lambda: g.fig10_serie_temporelle_lof(pays, volet, animate=False)),
                             ("fig12", lambda: g.fig12_bar_chart_indicateurs(pays, volet)),
                             ("fig13", lambda: g.fig13_heatmap_anomalies(pays, volet)),
                             ("fig8",  lambda: g.fig8_distribution_lof(pays, volet)),
