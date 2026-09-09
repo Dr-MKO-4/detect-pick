@@ -25,6 +25,10 @@ TEST_START: str = "2020-03-01"
 ALPHA_LOW:   float = 0.05   # 95 % coverage
 ALPHA_HIGH:  float = 0.10   # 90 % coverage
 CAL_SPLIT:   float = 0.20   # fraction for SSBC calibration
+MIN_CAL_WINDOWS: int = 20   # nb minimal de fenêtres de calibration exploitables
+                            # (sous ce seuil, le calendrier TRAIN_END/TEST_START
+                            # ne donne pas assez de points pour une CP fiable —
+                            # on replie sur CAL_SPLIT du train, cf. fit_from_lof)
 
 # ── SHAP ──────────────────────────────────────────────────────────────────────
 SHAP_N_BG:  int = 50   # background set size for DeepExplainer

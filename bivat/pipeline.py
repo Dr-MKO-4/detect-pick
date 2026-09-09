@@ -144,13 +144,42 @@ class PipelineBiVAT:
         cal_mask   = (dates > train_end) & (dates < test_start)
         test_mask  = dates >= test_start
 
-        X_train = X_full[train_mask]
-        X_cal   = X_full[cal_mask] if cal_mask.any() else X_full[train_mask][-int(len(X_full) * C.CAL_SPLIT):]
-        X_test  = X_full[test_mask]
+        # Nombre de fenêtres de calibration exploitables si on utilise le
+        # calendrier TRAIN_END/TEST_START tel quel (n_windows = n_mois - window + 1).
+        n_cal_calendar = int(cal_mask.sum())
+        n_cal_windows_calendar = max(0, n_cal_calendar - window + 1)
 
-        self.dates_train = dates[train_mask]
-        self.dates_cal   = dates[cal_mask] if cal_mask.any() else dates[train_mask][-len(X_cal):]
-        self.dates_test  = dates[test_mask]
+        if n_cal_windows_calendar >= C.MIN_CAL_WINDOWS:
+            X_train = X_full[train_mask]
+            X_cal   = X_full[cal_mask]
+            X_test  = X_full[test_mask]
+            self.dates_train = dates[train_mask]
+            self.dates_cal   = dates[cal_mask]
+            self.dates_test  = dates[test_mask]
+        else:
+            # Calendrier TRAIN_END/TEST_START insuffisant pour une calibration
+            # conforme fiable (ex. 2 mois seulement entre les deux dates) : on
+            # déplace la frontière et on prélève CAL_SPLIT de la fin du train
+            # comme calibration, au lieu de padder avec la fin du train tout
+            # en la recomptant dans le train (qui ne donnait qu'1 point de
+            # calibration au final — Fig. E illisible).
+            n_train_full = int(train_mask.sum())
+            n_cal_take   = max(window + C.MIN_CAL_WINDOWS - 1,
+                               int(n_train_full * C.CAL_SPLIT))
+            n_cal_take   = max(0, min(n_cal_take, n_train_full - window))  # garder du train
+            logger.info(
+                "[BIVAT] Calendrier cal insuffisant (%d fenêtre(s) sur %d mois) — "
+                "repli sur les %d derniers mois du train comme calibration",
+                n_cal_windows_calendar, n_cal_calendar, n_cal_take)
+
+            X_train_full = X_full[train_mask]
+            dates_train_full = dates[train_mask]
+            X_train = X_train_full[:-n_cal_take] if n_cal_take > 0 else X_train_full
+            X_cal   = X_train_full[-n_cal_take:] if n_cal_take > 0 else X_full[cal_mask]
+            X_test  = X_full[test_mask]
+            self.dates_train = dates_train_full[:-n_cal_take] if n_cal_take > 0 else dates_train_full
+            self.dates_cal   = dates_train_full[-n_cal_take:] if n_cal_take > 0 else dates[cal_mask]
+            self.dates_test  = dates[test_mask]
 
         # Garantir que X_cal contient au moins `window` périodes pour make_windows
         if len(X_cal) < window:
@@ -159,7 +188,7 @@ class PipelineBiVAT:
             logger.info("[BIVAT] Cal trop court (%d < window=%d) — complété avec %d périodes de fin de train",
                         len(X_cal), window, take)
             X_cal          = np.concatenate([X_train[-take:], X_cal])
-            self.dates_cal = dates[train_mask][-take:].append(self.dates_cal)
+            self.dates_cal = dates_train_full[-take:].append(self.dates_cal) if n_cal_windows_calendar < C.MIN_CAL_WINDOWS else dates[train_mask][-take:].append(self.dates_cal)
 
         if len(X_test) == 0:
             logger.warning("[BIVAT] Aucune donnée après TEST_START=%s  repli sur split 80/20", C.TEST_START)
