@@ -201,7 +201,14 @@ def render_analyse(pays: str = "cameroun", volet: str = "Actif",
         if fig_json:
             try:
                 fig_obj = _cached_fig(fig_id, fig_json)
+                # uirevision stable par figure : sans ça, Plotly réinitialise le
+                # zoom/pan et l'état des boutons du modebar (ex. hovermode,
+                # légende repliée) à chaque re-rendu de la page (changement de
+                # phase, de résultats, de statut du pipeline…) même si la figure
+                # elle-même n'a pas changé.
+                fig_obj.update_layout(uirevision=fig_id)
                 body = dcc.Graph(
+                    id=f"graph-{fig_id}",
                     figure=fig_obj,
                     config={"displayModeBar": True, "responsive": True,
                             "toImageButtonOptions": {"format": "png", "scale": 2}},

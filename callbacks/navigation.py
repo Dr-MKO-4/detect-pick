@@ -24,6 +24,16 @@ def navigate(n_d, n_a, n_r, n_m, n_o, n_h, n_p, n_c, n_adm, current_page, auth):
     ctx = dash.callback_context
     if not ctx.triggered:
         return current_page
+    # Les items de nav (layout/shell.py) sont recréés à chaque rendu de
+    # page-container avec n_clicks=0 codé en dur. Si un item avait déjà été
+    # cliqué plus tôt dans la session (n_clicks > 0 côté navigateur), le
+    # prochain rendu ramène sa valeur à 0 : Dash détecte ce changement de prop
+    # et redéclenche ce callback comme s'il s'agissait d'un vrai clic, ce qui
+    # navigue silencieusement vers cet onglet. On ignore donc tout
+    # déclenchement dont la nouvelle valeur n'est pas un n_clicks strictement
+    # positif (un vrai clic incrémente toujours le compteur).
+    if not ctx.triggered[0]["value"]:
+        return current_page
     trigger = ctx.triggered[0]["prop_id"].split(".")[0]
     return {
         "nav-donnees":      "donnees",
@@ -51,6 +61,11 @@ def update_phase(n1, n2, n3, n4, current_phase):
     ctx = dash.callback_context
     if not ctx.triggered:
         return current_phase
+    # Voir le commentaire dans navigate() ci-dessus : les boutons de phase sont
+    # recréés à chaque rendu avec n_clicks=0, un remount peut donc déclencher
+    # ce callback avec une valeur retombée à 0 (pas un vrai clic).
+    if not ctx.triggered[0]["value"]:
+        return current_phase
     trigger = ctx.triggered[0]["prop_id"].split(".")[0]
     return {"btn-phase-1": 1, "btn-phase-2": 2,
             "btn-phase-3": 3, "btn-phase-4": 4}.get(trigger, current_phase)
@@ -77,6 +92,10 @@ def sync_pays_volet(pays, volet):
 def switch_model_btn(n_lof, n_bivat):
     ctx = dash.callback_context
     if not ctx.triggered:
+        return dash.no_update, dash.no_update
+    # Voir le commentaire dans navigate() : n_clicks retombé à 0 lors d'un
+    # remount du bouton ne doit pas être traité comme un vrai clic.
+    if not ctx.triggered[0]["value"]:
         return dash.no_update, dash.no_update
     trigger = ctx.triggered[0]["prop_id"].split(".")[0]
     val = "lof" if trigger == "btn-model-lof" else "bivat"

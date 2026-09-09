@@ -305,7 +305,13 @@ def poll_pipeline(n):
     label    = _pipeline_state.get("label", "")
     if not _pipeline_state["running"] and _pipeline_state["results"] is not None:
         return _pipeline_state["results"], False, True, progress, label
-    return dash.no_update, _pipeline_state["running"], dash.no_update, progress, label
+    # store-pipeline-running est un Input de render_page (app.py) : le repousser
+    # à chaque tick (même valeur True) reconstruit toute la page — sidebar
+    # comprise — en boucle pendant le run, ce qui réinitialise les n_clicks des
+    # boutons de nav à 0 et peut déclencher une navigation fantôme (cf. navigate()
+    # dans callbacks/navigation.py). On ne le pousse donc que lorsqu'il change
+    # réellement (passage à False, géré ci-dessus).
+    return dash.no_update, dash.no_update, dash.no_update, progress, label
 
 
 # ── BiVAT ─────────────────────────────────────────────────────────────────────
@@ -506,7 +512,9 @@ def start_bivat_pipeline(n, pays, volet, modele, auth):
 def poll_bivat(n):
     if not _bivat_state["running"] and _bivat_state["results"] is not None:
         return _bivat_state["results"], False, True
-    return dash.no_update, _bivat_state["running"], dash.no_update
+    # Même raison que poll_pipeline() : store-bivat-running est un Input de
+    # render_page, ne le repousser que lors d'un changement réel.
+    return dash.no_update, dash.no_update, dash.no_update
 
 
 # ── Journal page Modèles ──────────────────────────────────────────────────────

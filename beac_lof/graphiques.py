@@ -37,6 +37,14 @@ def _fmt_mois(dt) -> str:
         return str(dt)[:7]
 
 
+def _date_xaxis(dtick: str = "M12", tickformat: str = "%Y") -> dict:
+    """Axe x temporel : ticks gradués sur toute la période (annuels par défaut),
+    pas un label par mois. À utiliser avec des x réellement datetime (pas des
+    libellés déjà formatés en chaîne, sans quoi Plotly retombe en axe catégoriel
+    et affiche un tick par valeur unique)."""
+    return dict(type="date", dtick=dtick, tickformat=tickformat, ticklabelmode="period")
+
+
 class BEACGraphiques:
     """
     Conteneur de toutes les figures Plotly du pipeline de détection LOF-BEAC.
@@ -303,10 +311,10 @@ class BEACGraphiques:
             for comp, label, color in zip(COMPS, LABELS, COLORS):
                 df_comp = stl.get(comp, res_df if comp == "residual" else pd.DataFrame())
                 if isinstance(df_comp, pd.DataFrame) and ind and ind in df_comp.columns:
-                    x = [str(d) for d in df_comp.index]
+                    x = list(df_comp.index)
                     y = df_comp[ind].tolist()
                 elif isinstance(df_comp, pd.Series):
-                    x = [str(d) for d in df_comp.index]
+                    x = list(df_comp.index)
                     y = df_comp.tolist()
                 else:
                     x, y = [], []
@@ -329,7 +337,7 @@ class BEACGraphiques:
                 for comp in COMPS:
                     df_comp = stl.get(comp, res_df if comp == "residual" else pd.DataFrame())
                     if isinstance(df_comp, pd.DataFrame) and ind_name in df_comp.columns:
-                        x_vals.append([str(d) for d in df_comp.index])
+                        x_vals.append(list(df_comp.index))
                         y_vals.append(df_comp[ind_name].tolist())
                     else:
                         x_vals.append([])
@@ -354,6 +362,7 @@ class BEACGraphiques:
             height=750,
             margin=dict(t=140, b=100),
         )
+        fig.update_xaxes(**_date_xaxis())
         return fig
 
     # ==================================================================
@@ -858,7 +867,10 @@ class BEACGraphiques:
             fig.update_layout(title=f"Fig. 10  Aucun score LOF*  {self._label(pays, volet)}")
             return fig
 
-        dates = [_fmt_mois(d) for d in scores.index]
+        # x réellement datetime (pas des libellés pré-formatés en chaîne) pour
+        # que Plotly gère un axe de type "date" avec des ticks gradués sur
+        # toute la période, plutôt qu'un axe catégoriel affichant chaque mois.
+        dates = list(scores.index)
         vals = scores.values.tolist()
 
         if not animate:
@@ -881,7 +893,7 @@ class BEACGraphiques:
                 tau_i  = self.tau.get(k_i)
                 is_ini = (k_i == init_k)
 
-                dates_i = [_fmt_mois(d) for d in sc_i.index]
+                dates_i = list(sc_i.index)
                 vals_i  = sc_i.values.tolist()
 
                 # Trace 0  courbe LOF*
@@ -942,6 +954,7 @@ class BEACGraphiques:
                       f"{self._label(pays, volet)}{tau_str_init}",
                 xaxis_title="Date", yaxis_title="Score LOF*", height=450,
                 margin=dict(t=110),
+                xaxis=_date_xaxis(),
                 updatemenus=[self._dropdown_menu(buttons)],
             )
             return fig
@@ -966,13 +979,14 @@ class BEACGraphiques:
         for i, end in enumerate(range(step, len(dates) + 1, step), start=1):
             lbl = dates[end - 1] if end - 1 < len(dates) else dates[-1]
             slider_steps.append(dict(
-                method="animate", label=lbl,
+                method="animate", label=_fmt_mois(lbl),
                 args=[[str(end)], dict(mode="immediate", frame=dict(duration=0, redraw=True))],
             ))
 
         fig.update_layout(
             title=f"Fig. 10  Série temporelle LOF* (animée)  {self._label(pays, volet)}",
-            xaxis_title="Mois", yaxis_title="Score LOF*",
+            xaxis_title="Date", yaxis_title="Score LOF*",
+            xaxis=_date_xaxis(),
             yaxis=dict(range=[0, max(vals) * 1.15]),
             updatemenus=[dict(
                 type="buttons", showactive=False, y=1.1, x=0.5, xanchor="center",
@@ -1017,7 +1031,7 @@ class BEACGraphiques:
 
         def _add_traces(sc, df_b, tau_v, ind_idx=0):
             traces = []
-            x_dates = [_fmt_mois(d) for d in sc.index] if not sc.empty else []
+            x_dates = list(sc.index) if not sc.empty else []
             traces.append(go.Scatter(
                 x=x_dates, y=sc.values.tolist() if not sc.empty else [],
                 name="LOF*", line=dict(color="#1f77b4", width=1.5), yaxis="y",
@@ -1059,6 +1073,7 @@ class BEACGraphiques:
         fig.update_layout(
             title=f"Fig. 11  LOF* vs Indicateur brut  {self._label(pays, volet)}",
             xaxis_title="Date",
+            xaxis=_date_xaxis(),
             yaxis_title="Score LOF*",
             yaxis2_title="Valeur indicateur",
             height=480,
@@ -1529,7 +1544,7 @@ class BEACGraphiques:
                 ),
                 font=dict(size=14),
             ),
-            xaxis=dict(title="Date (centre de fenêtre)"),
+            xaxis=dict(title="Date (centre de fenêtre)", **_date_xaxis()),
             yaxis=dict(title="Variance cumulée expliquée", tickformat=".0%", range=[0, 1.05]),
             height=480,
             margin=dict(t=100, b=60),
@@ -1647,6 +1662,7 @@ class BEACGraphiques:
             legend=dict(orientation="h", yanchor="bottom", y=1.04, xanchor="right", x=1),
         )
         fig.update_yaxes(title_text="LOF*")
+        fig.update_xaxes(**_date_xaxis())
         return fig
 
     # ==================================================================

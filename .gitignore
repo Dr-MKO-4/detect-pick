@@ -10,6 +10,9 @@ __pycache__/
 # Cache applicatif (figures régénérables)
 cache/
 
+# Résultats de recherche d'hyperparamètres (régénérables via optimize.py)
+models/hp/
+
 # Logs
 logs/*.log
 

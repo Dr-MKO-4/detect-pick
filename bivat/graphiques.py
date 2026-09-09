@@ -35,6 +35,14 @@ def _fmt_mois(dt) -> str:
     except Exception:
         return str(dt)[:7]
 
+
+def _date_xaxis(title: str = "Date", dtick: str = "M12", tickformat: str = "%Y") -> dict:
+    """Axe x temporel gradué sur toute la période (ticks annuels), pas un label
+    par mois — nécessite des x réellement datetime."""
+    return dict(title=title, type="date", dtick=dtick, tickformat=tickformat,
+                ticklabelmode="period",
+                gridcolor="rgba(255,255,255,0.06)", zeroline=False)
+
 # Design tokens (match assets/style.css dark theme)
 GOLD  = "#D4A020"
 RED   = "#E05252"
@@ -145,7 +153,7 @@ class BiVATGraphiques:
                             f"<sup>Couverture conforme Pr(s ≤ q̂₀.₉₀) = {(~anom_mask).sum()}/{len(anom_mask)} "
                             f"= {100*(~anom_mask).mean():.0f}%  [cible ≥ 90%]</sup>",
                        font=dict(size=14)),
-            xaxis_title="Mois",
+            xaxis=_date_xaxis(),
             yaxis_title="s_discrim",
             height=420,
         )
@@ -231,7 +239,7 @@ class BiVATGraphiques:
                             "<sup>Vert pâle : accord normalité · Rouge pâle : accord anomalie · "
                             "Orange gauche : LOF seul · Orange droit : BiVAT seul</sup>",
                        font=dict(size=13)),
-            xaxis_title="Date",
+            xaxis=_date_xaxis(),
             yaxis=dict(title="Score normalisé [0,1]", range=[-0.05, 1.1],
                        gridcolor="rgba(255,255,255,0.06)", zeroline=False),
             height=440,
@@ -318,7 +326,7 @@ class BiVATGraphiques:
             title=dict(text="Fig. E bis  Score BiVAT + intervalles CP (rolling)  fenêtre test<br>"
                             "<sup>Bande grisée : mars 2020 – déc 2021 (COVID-19, CP pondérée active)</sup>",
                        font=dict(size=13)),
-            xaxis_title="Date", yaxis_title="s_discrim",
+            xaxis=_date_xaxis(), yaxis_title="s_discrim",
             height=440,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         )
