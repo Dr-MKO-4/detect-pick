@@ -38,10 +38,16 @@ def _kl_divergence(mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
 
 
 def _elbo(x: torch.Tensor, out: dict, beta: float = C.BETA) -> torch.Tensor:
-    """ELBO = reconstruction MSE - β · KL."""
+    """Perte à MINIMISER = -ELBO = reconstruction MSE + β · KL.
+
+    KL(q(z|x) || p(z)) est toujours ≥ 0 (cf. _kl_divergence). La SOUSTRAIRE
+    (mse - beta*kl) incite l'optimiseur à maximiser le KL sans limite —
+    exactement le comportement observé en pratique (KL explosant de 0,1 à
+    10^25 en 20 époques). Le terme doit être ADDITIONNÉ, comme dans la
+    formulation standard de la loss VAE (Kingma & Welling, 2013)."""
     mse = F.mse_loss(out["x_hat"], x)
     kl  = _kl_divergence(out["mu"], out["logvar"])
-    return mse - beta * kl
+    return mse + beta * kl
 
 
 # ── Window dataset ────────────────────────────────────────────────────────────
@@ -119,7 +125,7 @@ def train(
                     mse    = F.mse_loss(out["x_hat"], xb)
                     kl     = _kl_divergence(out["mu"], out["logvar"])
                     ad     = _assoc_discrepancy(out["attn"])
-                    loss_1 = mse - beta * kl + lambda_ad * ad
+                    loss_1 = mse + beta * kl + lambda_ad * ad
                 scaler.scale(loss_1).backward()
                 scaler.step(optimizer)
                 scaler.update()
@@ -128,7 +134,7 @@ def train(
                 mse    = F.mse_loss(out["x_hat"], xb)
                 kl     = _kl_divergence(out["mu"], out["logvar"])
                 ad     = _assoc_discrepancy(out["attn"])
-                loss_1 = mse - C.BETA * kl + lambda_ad * ad
+                loss_1 = mse + beta * kl + lambda_ad * ad
                 loss_1.backward()
                 optimizer.step()
 
@@ -157,7 +163,7 @@ def train(
         avg_mse  = epoch_mse / n_batches
         avg_kl   = epoch_kl  / n_batches
         avg_ad   = epoch_ad  / n_batches
-        avg_loss = avg_mse - beta * avg_kl + lambda_ad * avg_ad
+        avg_loss = avg_mse + beta * avg_kl + lambda_ad * avg_ad
         epoch_time = _time.time() - t_epoch
 
         avg = {
