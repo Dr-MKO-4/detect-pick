@@ -1,0 +1,84 @@
+<h2 style="color:#7a4f00">Guide des figures</h2>
+<p>Ce que montre chaque graphique de l'onglet <b>Analyse</b>, comment le lire, et
+la décision qu'il permet de prendre. Détails complets : <code>Docu/graphique.tex</code>.</p>
+
+<h3>Phase 1 &mdash; Prétraitement (LOF*)</h3>
+<table border="0" cellpadding="6">
+<tr><td><b>Fig. 1</b></td><td>Carte des données manquantes (indicateurs &times; mois). Case noire = valeur
+manquante. Sert à vérifier la stratégie d'imputation et à repérer un indicateur trop
+incomplet (&gt; 20&nbsp;% de trous) avant de l'exclure.</td></tr>
+<tr><td><b>Fig. 2</b></td><td>Corrélations entre les résidus STL des indicateurs, regroupés par
+similarité. Des blocs visibles confirment que la réduction de dimension (RPCA/ACP) est
+justifiée.</td></tr>
+<tr><td><b>Fig. 3</b></td><td>Décomposition d'un indicateur en 4 panneaux : série brute, tendance,
+saisonnalité, résidu. Montre pourquoi le LOF* travaille sur le résidu et non sur la
+donnée brute.</td></tr>
+<tr><td><b>Fig. A</b></td><td>Variance expliquée par les composantes RPCA, calculée sur des fenêtres
+glissantes de 36 mois. Une chute sous 90&nbsp;% signale un changement de structure des
+données (ex. COVID-19), indépendamment de tout score LOF*/BiVAT.</td></tr>
+</table>
+
+<h3>Phase 2 &mdash; Calibration</h3>
+<table border="0" cellpadding="6">
+<tr><td><b>Fig. 4</b></td><td>Scree plot RPCA : variance expliquée par composante et courbe cumulée.
+Justifie le nombre de composantes retenues.</td></tr>
+<tr><td><b>Fig. 5</b></td><td>Biplot ACP (2 premières composantes) &mdash; exploratoire uniquement,
+ne valide pas les scores LOF* (qui utilisent plus de dimensions).</td></tr>
+<tr><td><b>Fig. 6</b></td><td>Projection UMAP colorée par score LOF* &mdash; exploratoire, sensible à
+l'initialisation aléatoire.</td></tr>
+<tr><td><b>Fig. 7</b></td><td>Stabilité des 20 scores LOF* les plus élevés selon MinPts &isin; [10, 30].
+Une courbe qui reste au-dessus du seuil &tau; sur toute la plage = anomalie robuste.</td></tr>
+<tr><td><b>Fig. 8</b></td><td>Distribution des scores LOF* avec les seuils &tau;<sub>IQR</sub> et
+&tau;<sub>95</sub>. Situe le nombre d'anomalies marginales vs robustes.</td></tr>
+<tr><td><b>Fig. E</b></td><td>Score BiVAT + intervalles de confiance (Conformal Prediction) sur la
+fenêtre de calibration. Valide que le quantile utilisé comme seuil est bien calibré.</td></tr>
+</table>
+
+<h3>Phase 3 &mdash; Résultats (fenêtre de test)</h3>
+<table border="0" cellpadding="6">
+<tr><td><b>Fig. 9</b></td><td>Boxplot des scores LOF* par année. Une boîte anormalement haute en 2020
+ou 2015&ndash;2016 confirme la cohérence avec les chocs CEMAC documentés.</td></tr>
+<tr><td><b>Fig. 10</b></td><td>Graphique principal : score LOF*(t) sur toute la période, avec
+&tau;<sub>IQR</sub> (orange) et &tau;<sub>95</sub> (rouge). Les pics <i>non</i> annotés par un
+événement connu sont les plus intéressants à investiguer.</td></tr>
+<tr><td><b>Fig. 11</b></td><td>Pour une anomalie donnée : série brute, résidu STL et score LOF* sur la
+même fenêtre &plusmn;24 mois. Distingue une anomalie de <i>niveau</i> (visible sur la série
+brute) d'une anomalie de <i>dynamique</i> (visible seulement sur le résidu).</td></tr>
+<tr><td><b>Fig. 12</b></td><td>Les 15 indicateurs qui contribuent le plus à un mois anomal. Rouge =
+déviation à la hausse, bleu = à la baisse. Répond à « quel poste du bilan porte
+l'anomalie ? ».</td></tr>
+<tr><td><b>Fig. 13</b></td><td>Heatmap indicateurs &times; mois anomaux. Lecture croisée immédiate :
+quels indicateurs sont anomaux, à quels mois, regroupés par similarité.</td></tr>
+<tr><td><b>Fig. 14</b></td><td>Heatmap inter-pays (mois &times; 6 pays CEMAC). Si &ge;&nbsp;3 pays
+dépassent leur seuil le même mois &rarr; anomalie <b>systémique</b> (choc régional), sinon
+anomalie idiosyncratique (un seul pays).</td></tr>
+<tr><td><b>Fig. B</b></td><td>Scores LOF* Actif et Passif superposés pour un pays. Zone rouge =
+anomalie concordante (événement réel probable) ; zone orange = discordante (à vérifier
+comptablement, car Actif doit toujours égaler Passif).</td></tr>
+</table>
+
+<h3>Phase 4 &mdash; Comparaison inter-modèles (LOF* vs BiVAT)</h3>
+<table border="0" cellpadding="6">
+<tr><td><b>Fig. D</b></td><td>LOF* et BiVAT normalisés sur [0,1], superposés. 4 zones : accord normal
+(vert), accord anomalie (rouge, alerte la plus fiable), LOF* seul (orange gauche,
+anomalie ponctuelle), BiVAT seul (orange droit, anomalie contextuelle/collective que le
+LOF* ne peut pas voir).</td></tr>
+<tr><td><b>Fig. E bis</b></td><td>Score BiVAT + intervalles de confiance sur la fenêtre de test. Un
+score au-dessus du seuil <i>et</i> dont l'intervalle bas reste au-dessus = anomalie
+robuste ; sinon anomalie à surveiller.</td></tr>
+<tr><td><b>Fig. F</b></td><td>Attribution SHAP : pour les 5 anomalies BiVAT les plus sévères, quels
+indicateurs expliquent le score (en %). Équivalent BiVAT de la Fig. 12, avec en plus le
+score LOF* correspondant pour comparaison.</td></tr>
+<tr><td><b>Fig. G</b></td><td>Bilan final : taux de concordance LOF*/BiVAT par pays et par type
+d'anomalie (ponctuelle, contextuelle, collective, systémique). Guide la répartition du
+travail : LOF* comme filtre rapide, BiVAT pour les anomalies contextuelles/collectives.</td></tr>
+</table>
+
+<h3>Lire les axes</h3>
+<ul>
+  <li>Les axes temporels affichent des <b>ticks annuels</b> (pas un point par mois) pour
+  rester lisibles sur toute la période ; utilisez le sélecteur <b>Année</b> pour zoomer.</li>
+  <li>Les noms d'indicateurs affichés sont le <b>nom lisible</b> (tronqué si long), pas le
+  code IFS technique ; le nom complet reste dans le fichier source
+  (colonne <code>Indicateurs</code>).</li>
+</ul>

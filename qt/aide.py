@@ -85,6 +85,7 @@ def show_aide(parent) -> None:
         ("Démarrage rapide", _load("general.html")),
         ("Pipeline LOF*",    _load("lof.html")),
         ("Pipeline BiVAT",   _load("bivat.html")),
+        ("Guide des figures", _load("figures.html")),
         ("Interprétation",   _load("interpretation.html")),
         ("Raccourcis",       _load("raccourcis.html")),
     ])
