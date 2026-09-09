@@ -193,29 +193,49 @@ class PipelineLOF:
         _UPSTREAM_CACHE[key] = result
         return result
 
+    def preprocess(self, pays: str, volet: str) -> dict:
+        """
+        Exécute uniquement le prétraitement (Phase 1 : chargement, imputation,
+        MAD, STL, RPCA, ACP), sans le calcul LOF*.
+
+        Le résultat est mis en cache au niveau module (voir
+        _compute_upstream) : un fit() ultérieur sur le même (pays, volet)
+        avec les mêmes hyperparamètres réutilise ce prétraitement au lieu
+        de le relancer.
+
+        Retourne le dict brut de _compute_upstream (df_brut, résidus, RPCA,
+        ACP…), déjà stocké sur l'instance (self.residus[k], etc.).
+        """
+        k = (pays.lower(), volet)
+        log.info("=== Prétraitement %s / %s ===", pays.capitalize(), volet)
+
+        up = self._compute_upstream(pays, volet)
+        self.data_brute[k]          = up["df_brut"].copy()
+        self.data_imputed[k]        = up["df_imp"]
+        self.indicateurs_exclus[k]  = up["excluded"]
+        self.residus[k]             = up["residus"]
+        self.data_std[k]            = up["df_std"]
+        self.data_stl[k]            = up["composantes_stl"]
+        self.L_rpca[k]              = up["L"]
+        self.S_rpca[k]              = up["S"]
+        self.composantes_pca[k]     = up["proj"]
+        self.loadings_pca[k]        = up["loadings_df"]
+        self.variance_explained[k]  = up["var_ratio"]
+        return up
+
     def fit(self, pays: str, volet: str) -> dict:
         """
-        Exécute le pipeline complet sur le fichier (pays, volet).
+        Exécute le pipeline complet sur le fichier (pays, volet) : réutilise
+        (ou calcule) le prétraitement, puis le calcul LOF*.
 
         Retourne un dict synthétique avec les métriques clés.
         """
         k = (pays.lower(), volet)
         log.info("=== %s / %s ===", pays.capitalize(), volet)
 
-        up = self._compute_upstream(pays, volet)
-        self.data_brute[k]          = up["df_brut"].copy()
-        self.data_imputed[k]        = up["df_imp"]
-        self.indicateurs_exclus[k]  = up["excluded"]
-        residus                     = up["residus"]
-        self.residus[k]             = residus
-        self.data_std[k]            = up["df_std"]
-        self.data_stl[k]            = up["composantes_stl"]
-        self.L_rpca[k]              = up["L"]
-        self.S_rpca[k]              = up["S"]
-        proj                        = up["proj"]
-        self.composantes_pca[k]     = proj
-        self.loadings_pca[k]        = up["loadings_df"]
-        self.variance_explained[k]  = up["var_ratio"]
+        self.preprocess(pays, volet)
+        residus = self.residus[k]
+        proj    = self.composantes_pca[k]
 
         # §5/6  LOF*
         n_obs = proj.shape[0]
@@ -238,7 +258,7 @@ class PipelineLOF:
         return {
             "pays": pays, "volet": volet,
             "n_obs": n_obs,
-            "n_indicateurs": up["df_imp"].shape[1],
+            "n_indicateurs": self.data_imputed[k].shape[1],
             "n_anomalies_tau": n_anom,
             "tau": tau_val,
             "tau_p95": p95_val,

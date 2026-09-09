@@ -123,9 +123,20 @@ def analyse_controls(running: bool = False, modele: str = "lof",
             clearable=False,
         ),
         html.Hr(style={"border": "none", "borderTop": "1px solid var(--border)", "margin": "8px 0"}),
+        # Prétraitement seul (Phase 1) : chargement, imputation, MAD, STL,
+        # RPCA, ACP — sans le calcul LOF*. Permet d'inspecter fig1/2/3/A
+        # avant de lancer l'analyse complète (mise en cache automatique :
+        # l'analyse complète réutilise ce prétraitement sans le refaire).
+        html.Button(
+            [svg(ICO_PLAY, 12), " Prétraitement seul"],
+            id="btn-run-preprocess", n_clicks=0,
+            className="btn btn-ghost",
+            style={"width": "100%", "justifyContent": "center", "marginBottom": "6px",
+                   "display": "none" if (running or modele == "bivat") else "flex"},
+        ),
         # Run / Stop buttons
         html.Button(
-            [svg(ICO_PLAY, 12), " Exécuter"],
+            [svg(ICO_PLAY, 12), " Analyse complète" if modele != "bivat" else " Exécuter"],
             id="btn-run-pipeline", n_clicks=0,
             className="btn btn-solid-gold",
             style={"width": "100%", "justifyContent": "center",
@@ -239,7 +250,12 @@ def render_analyse(pays: str = "cameroun", volet: str = "Actif",
                                 className="tag tag-red",
                                 style={"marginLeft": "8px", "fontSize": "9px", "gap": "3px"})
         else:
-            wait_msg = "En cours…" if running else "Lancez l'analyse"
+            if running:
+                wait_msg = "En cours…"
+            elif phase == 1 and not is_bivat:
+                wait_msg = "Lancez le prétraitement"
+            else:
+                wait_msg = "Lancez l'analyse"
             body = html.Div(
                 style={"height": "130px", "display": "flex", "alignItems": "center",
                        "justifyContent": "center", "color": "var(--muted2)", "fontSize": "11px"},

@@ -117,6 +117,96 @@ def _check_alert_threshold(pays: str, volet: str, model_label: str,
 # ── LOF* ──────────────────────────────────────────────────────────────────────
 
 @callback(
+    Output("store-pipeline-running", "data", allow_duplicate=True),
+    Output("interval-pipeline",      "disabled", allow_duplicate=True),
+    Input("btn-run-preprocess",      "n_clicks"),
+    State("dd-pays",    "value"),
+    State("dd-volet",   "value"),
+    State("store-auth", "data"),
+    prevent_initial_call=True,
+)
+def start_preprocessing(n, pays, volet, auth):
+    """Lance uniquement la Phase 1 (chargement, imputation, MAD, STL, RPCA,
+    ACP) sans le calcul LOF* — permet d'inspecter fig1/2/3/A avant de
+    lancer l'analyse complète. Le prétraitement est mis en cache au niveau
+    du pipeline (PipelineLOF._compute_upstream) : lancer ensuite l'analyse
+    complète sur le même pays/volet le réutilise sans le recalculer."""
+    if not n or _pipeline_state.get("running"):
+        return dash.no_update, dash.no_update
+
+    user_id = (auth or {}).get("user_id")
+
+    def _run():
+        t0 = time.time()
+        _pipeline_state.update(running=True, log=[], results=None,
+                               progress=0, run_id=None)
+
+        def _log(msg: str):
+            _pipeline_state["log"].append(msg)
+
+        run_id = models.create_run(
+            user_id, pays, volet, "lof",
+            {"data_dir": DATA_DIR, "pays": pays, "volet": volet, "phase": "preprocess"},
+        )
+        _pipeline_state["run_id"] = run_id
+
+        try:
+            import plotly.io as pio
+            from beac_lof.pipeline import PipelineLOF
+
+            p = _pipeline_state.get("lof_pipeline")
+            if p is None:
+                p = PipelineLOF(data_dir=DATA_DIR)
+                _pipeline_state["lof_pipeline"] = p
+
+            _log("[INFO] Chargement XLSX…")
+            _pipeline_state.update(label="Chargement XLSX…", progress=10)
+
+            p.preprocess(pays, volet)
+            _pipeline_state.update(label="Prétraitement terminé — génération figures…", progress=60)
+            _log("[INFO] Prétraitement terminé (imputation · MAD · STL · RPCA · ACP).")
+
+            g = p.vers_graphiques()
+            figs_json: dict = {}
+            phase1_tasks = [
+                ("fig1", lambda: g.fig1_missing_data_map(pays, volet)),
+                ("fig2", lambda: g.fig2_heatmap_correlations_stl(pays, volet)),
+                ("fig3", lambda: g.fig3_decomposition_stl(pays, volet)),
+                ("figA", lambda: g.figA_variance_rpca_temporelle(pays, volet)),
+            ]
+            for n_done, (fig_id, fn) in enumerate(phase1_tasks, start=1):
+                try:
+                    json_val = pio.to_json(fn())
+                    figs_json[fig_id] = json_val
+                    models.save_figure(run_id, fig_id, json_val)
+                    _log(f"[FIG] {fig_id} sauvegardé")
+                except Exception as fe:
+                    _log(f"[WARN] {fig_id} : {fe}")
+                _pipeline_state["progress"] = 60 + int(40 * n_done / len(phase1_tasks))
+
+            results = {"figures_json": figs_json, "pays": pays, "volet": volet,
+                      "run_id": run_id, "preprocess_only": True}
+            _pipeline_state["results"] = results
+            _pipeline_state["progress"] = 100
+
+            duration_ms = int((time.time() - t0) * 1000)
+            models.finish_run(run_id, "success", duration_ms, None, None)
+            models.log_audit(user_id, "run_preprocess_complete",
+                             details={"run_id": run_id, "pays": pays, "volet": volet})
+            _log("[DONE] Prétraitement terminé — figures sauvegardées sur disque.")
+        except Exception as e:
+            _log(f"[ERROR] {e}")
+            _log(traceback.format_exc())
+            models.finish_run(run_id, "error", int((time.time() - t0) * 1000), None, None)
+        finally:
+            _pipeline_state["running"] = False
+            close_connection()
+
+    threading.Thread(target=_run, daemon=True).start()
+    return True, False
+
+
+@callback(
     Output("store-pipeline-running", "data"),
     Output("interval-pipeline",      "disabled"),
     Input("btn-run-pipeline",        "n_clicks"),
