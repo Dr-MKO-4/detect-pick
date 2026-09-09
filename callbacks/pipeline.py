@@ -48,6 +48,37 @@ def _load_cached_lof_run(cache_key: str | None) -> dict | None:
         return None
     return {"run_id": run_id, "figures_json": figs}
 
+
+def _bivat_cache_key(pays: str, volet: str) -> str | None:
+    """Clé de cache pour un run BiVAT (pays, volet) : invalide si le fichier
+    source OU les poids BiVAT (modèle ré-entraîné/optimisé) ont changé."""
+    try:
+        from beac_lof.config import FILE_MAP
+        fname = f"{FILE_MAP[pays.lower()]}_{volet}.xlsx"
+        data_mtime = os.path.getmtime(os.path.join(DATA_DIR, fname))
+        weights_path = os.path.join("models", f"bivat_{pays.lower()}_{volet.lower()}.pt")
+        weights_mtime = os.path.getmtime(weights_path)
+    except (KeyError, OSError):
+        return None
+    raw = f"{PIPELINE_CACHE_VERSION}:bivat:{pays.lower()}:{volet}:{data_mtime}:{weights_mtime}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _load_cached_bivat_run(cache_key: str | None) -> dict | None:
+    """Retourne {run_id, figures_json} si un run BiVAT identique est en cache."""
+    if not cache_key:
+        return None
+    run_id = models.get_cached_run_id(cache_key)
+    if run_id is None:
+        return None
+    run = models.get_run_by_id(run_id)
+    if not run or run.get("status") != "success":
+        return None
+    figs = models.load_figures_for_run(run_id)
+    if not figs:
+        return None
+    return {"run_id": run_id, "figures_json": figs}
+
 _pipeline_state: dict = {
     "running": False, "log": [], "results": None,
     "progress": 0, "label": "",
@@ -331,64 +362,102 @@ def _launch_bivat_thread(pays: str, volet: str, user_id):
             _bivat_state["running"] = False
             return
 
-        run_id = models.create_run(user_id, pays, volet, "bivat", {"pays": pays, "volet": volet})
-        _bivat_state["run_id"] = run_id
+        run_id     = None
+        is_new_run = False
 
         try:
             import plotly.io as pio
             from bivat.pipeline import PipelineBiVAT
 
-            _log("[INFO] Entraînement BiVAT…")
-            _bivat_state.update(label="Entraînement BiVAT…", progress=5)
+            cache_key = _bivat_cache_key(pays, volet)
+            cached    = _load_cached_bivat_run(cache_key)
 
-            b = PipelineBiVAT()
-            b.fit_from_lof(lof, pays, volet, log_callback=_log)
-            _bivat_state["progress"] = 70
-            q = getattr(b, "q_hat_95", None)
-            _log(f"[DONE] BiVAT entraîné · q̂₉₅ = {q:.4f}" if q else "[DONE] BiVAT entraîné")
+            if cached:
+                # Fichier source ET poids BiVAT inchangés depuis le dernier run
+                # réussi : on retrouve le run existant (même figures) plutôt
+                # que de tout recalculer (SHAP compris, l'étape la plus
+                # coûteuse). fit_from_lof() reste nécessaire pour reconstruire
+                # scores_test/q_hat en mémoire, mais recharge le checkpoint
+                # .pt existant (force_retrain=False) et saute SHAP.
+                run_id = cached["run_id"]
+                _bivat_state["run_id"] = run_id
+                _log(f"[INFO] Résultats BiVAT identiques trouvés en cache (run #{run_id}) "
+                     f"— figures non régénérées.")
+                _bivat_state.update(label="Résultats en cache", progress=40)
 
-            _bivat_state.update(label="Génération figures BiVAT…", progress=72)
-            g = b.vers_graphiques(lof_pipeline=lof)
-            figs_json: dict = {}
-            bivat_tasks = [
-                ("figE",     g.figE_intervalles_cp_calibration),
-                ("figD",     lambda: g.figD_comparaison_lof_bivat(pays, volet)),
-                ("figE_bis", g.figE_bis_bivat_cp_test),
-                ("figF",     g.figF_shap_top_anomalies),
-                ("figG",     g.figG_confusion_lof_bivat),
-            ]
-            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
-                def _gen(task):
-                    fid, fn = task
-                    try:
-                        return fid, pio.to_json(fn()), None
-                    except Exception as fe:
-                        return fid, None, str(fe)
-                for fig_id, json_val, err in pool.map(_gen, bivat_tasks):
-                    if json_val:
-                        figs_json[fig_id] = json_val
-                        models.save_figure(run_id, fig_id, json_val)
-                        _log(f"[INFO] {fig_id} sauvegardé")
-                    else:
-                        _log(f"[WARN] {fig_id} : {err}")
-                    _bivat_state["progress"] = min(_bivat_state["progress"] + 5, 94)
+                b = PipelineBiVAT()
+                b.fit_from_lof(lof, pays, volet, log_callback=_log, compute_shap=False)
+                _bivat_state["progress"] = 90
 
-            results = b.get_results()
-            results.update(figures_json=figs_json, run_id=run_id)
-            _bivat_state["results"] = results
+                results = b.get_results()
+                results.update(figures_json=cached["figures_json"], run_id=run_id)
+                _bivat_state["results"] = results
+                models.log_audit(user_id, "run_bivat_cache_hit",
+                                 details={"run_id": run_id, "pays": pays, "volet": volet})
+                _bivat_state["progress"] = 100
+                _log("[DONE] BiVAT terminé (résultats en cache).")
+            else:
+                is_new_run = True
+                run_id = models.create_run(user_id, pays, volet, "bivat", {"pays": pays, "volet": volet})
+                _bivat_state["run_id"] = run_id
 
-            duration_ms = int((time.time() - t0) * 1000)
-            models.finish_run(run_id, "success", duration_ms, results.get("n_anomalies"), None)
-            models.log_audit(user_id, "run_bivat_complete",
-                             details={"run_id": run_id, "pays": pays, "volet": volet})
-            _check_alert_threshold(pays, volet, "BiVAT", results.get("n_anomalies"), run_id)
-            _bivat_state["progress"] = 100
-            _log("[DONE] BiVAT terminé — figures sauvegardées sur disque.")
+                _log("[INFO] Entraînement BiVAT…")
+                _bivat_state.update(label="Entraînement BiVAT…", progress=5)
+
+                b = PipelineBiVAT()
+                b.fit_from_lof(lof, pays, volet, log_callback=_log)
+                _bivat_state["progress"] = 70
+                q = getattr(b, "q_hat_95", None)
+                _log(f"[DONE] BiVAT entraîné · q̂₉₅ = {q:.4f}" if q else "[DONE] BiVAT entraîné")
+
+                _bivat_state.update(label="Génération figures BiVAT…", progress=72)
+                g = b.vers_graphiques(lof_pipeline=lof)
+                figs_json: dict = {}
+                bivat_tasks = [
+                    ("figE",     g.figE_intervalles_cp_calibration),
+                    ("figD",     lambda: g.figD_comparaison_lof_bivat(pays, volet)),
+                    ("figE_bis", g.figE_bis_bivat_cp_test),
+                    ("figF",     g.figF_shap_top_anomalies),
+                    ("figG",     g.figG_confusion_lof_bivat),
+                ]
+                with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
+                    def _gen(task):
+                        fid, fn = task
+                        try:
+                            return fid, pio.to_json(fn()), None
+                        except Exception as fe:
+                            return fid, None, str(fe)
+                    for fig_id, json_val, err in pool.map(_gen, bivat_tasks):
+                        if json_val:
+                            figs_json[fig_id] = json_val
+                            models.save_figure(run_id, fig_id, json_val)
+                            _log(f"[INFO] {fig_id} sauvegardé")
+                        else:
+                            _log(f"[WARN] {fig_id} : {err}")
+                        _bivat_state["progress"] = min(_bivat_state["progress"] + 5, 94)
+
+                results = b.get_results()
+                results.update(figures_json=figs_json, run_id=run_id)
+                _bivat_state["results"] = results
+
+                duration_ms = int((time.time() - t0) * 1000)
+                models.finish_run(run_id, "success", duration_ms, results.get("n_anomalies"), None)
+                models.log_audit(user_id, "run_bivat_complete",
+                                 details={"run_id": run_id, "pays": pays, "volet": volet})
+                _check_alert_threshold(pays, volet, "BiVAT", results.get("n_anomalies"), run_id)
+                if cache_key:
+                    models.set_result_cache(cache_key, run_id)
+                _bivat_state["progress"] = 100
+                _log("[DONE] BiVAT terminé — figures sauvegardées sur disque.")
 
         except Exception as e:
             _log(f"[ERROR] {e}")
             _log(traceback.format_exc())
-            models.finish_run(run_id, "error", int((time.time() - t0) * 1000), None, None)
+            # Ne marquer "error" que le run qu'on vient de créer — jamais un
+            # run en cache déjà marqué "success" (ses figures restent valides
+            # même si fit_from_lof() échoue ensuite en relisant le checkpoint).
+            if is_new_run and run_id is not None:
+                models.finish_run(run_id, "error", int((time.time() - t0) * 1000), None, None)
         finally:
             _bivat_state["running"] = False
             close_connection()
