@@ -9,6 +9,7 @@ import dash
 from dash import callback, Output, Input, State
 from config import DATA_DIR
 from database import models, close_connection
+from bivat import config as C_BIVAT
 
 # Incrémenter cette version invalide immédiatement tous les caches existants —
 # à faire chaque fois que la logique du pipeline LOF (beac_lof/) change de
@@ -437,8 +438,18 @@ def poll_pipeline(n):
 
 # ── BiVAT ─────────────────────────────────────────────────────────────────────
 
-def _launch_bivat_thread(pays: str, volet: str, user_id):
-    """Lance le thread BiVAT. Appelé par le callback OU après auto-LOF."""
+def _launch_bivat_thread(pays: str, volet: str, user_id, force_retrain: bool = False, **hp):
+    """Lance le thread BiVAT. Appelé par le callback OU après auto-LOF.
+
+    hp : surcharges optionnelles passées telles quelles à
+    PipelineBiVAT.fit_from_lof() (epochs, beta_kl, lambda_ad, lr, window,
+    train_end, test_start, cal_split…) — utilisées par la page Modèles pour
+    reparamétrer entraînement et calibration indépendamment. Toute
+    surcharge non vide force force_retrain=True et ignore le cache
+    (le cache n'est valide que pour les hyperparamètres par défaut)."""
+    if hp:
+        force_retrain = True
+
     def _run():
         t0 = time.time()
         _bivat_state.update(running=True, log=[], results=None, progress=0, run_id=None)
@@ -459,7 +470,7 @@ def _launch_bivat_thread(pays: str, volet: str, user_id):
             import plotly.io as pio
             from bivat.pipeline import PipelineBiVAT
 
-            cache_key = _bivat_cache_key(pays, volet)
+            cache_key = None if (force_retrain or hp) else _bivat_cache_key(pays, volet)
             cached    = _load_cached_bivat_run(cache_key)
 
             if cached:
@@ -495,7 +506,8 @@ def _launch_bivat_thread(pays: str, volet: str, user_id):
                 _bivat_state.update(label="Entraînement BiVAT…", progress=5)
 
                 b = PipelineBiVAT()
-                b.fit_from_lof(lof, pays, volet, log_callback=_log)
+                b.fit_from_lof(lof, pays, volet, log_callback=_log,
+                               force_retrain=force_retrain, **hp)
                 _bivat_state["progress"] = 70
                 q = getattr(b, "q_hat_95", None)
                 _log(f"[DONE] BiVAT entraîné · q̂₉₅ = {q:.4f}" if q else "[DONE] BiVAT entraîné")
@@ -659,6 +671,63 @@ def start_bivat_pipeline(n, pays, volet, modele, auth):
             threading.Thread(target=_auto_lof, daemon=True).start()
             return True, False, True, False
         return True, False, dash.no_update, dash.no_update
+
+
+# ── Page Modèles : entraînement / recalibration BiVAT reparamétrable ─────────
+
+@callback(
+    Output("store-bivat-running",  "data", allow_duplicate=True),
+    Output("interval-bivat",       "disabled", allow_duplicate=True),
+    Output("bivat-train-hint",     "children"),
+    Input("btn-train-bivat",       "n_clicks"),
+    State("dd-modeles-pays",       "value"),
+    State("dd-modeles-volet",      "value"),
+    State("inp-bivat-epochs",      "value"),
+    State("inp-bivat-window",      "value"),
+    State("inp-bivat-lr",          "value"),
+    State("inp-bivat-beta",        "value"),
+    State("inp-bivat-lad",         "value"),
+    State("inp-bivat-train-end",   "value"),
+    State("inp-bivat-test-start",  "value"),
+    State("inp-bivat-cal-split",   "value"),
+    State("store-auth",            "data"),
+    prevent_initial_call=True,
+)
+def start_bivat_training(n, pays, volet, epochs, window, lr, beta, lambda_ad,
+                         train_end, test_start, cal_split, auth):
+    """Bouton "Entraîner / recalibrer BiVAT" de la page Modèles : lance
+    fit_from_lof() avec les hyperparamètres saisis (entraînement + split de
+    calibration), en forçant le ré-entraînement — reparamétrer n'a de sens
+    que si le résultat change réellement. Indépendant de la page Analyse :
+    utilise pays/volet choisis sur cette page (LOF* doit déjà avoir tourné
+    dessus, via la page Analyse)."""
+    if not n:
+        return dash.no_update, dash.no_update, dash.no_update
+    if _bivat_state.get("running") or _pipeline_state.get("running"):
+        return dash.no_update, dash.no_update, "Une analyse est déjà en cours — réessayez ensuite."
+
+    pays  = pays or "cameroun"
+    volet = volet or "Actif"
+    lof = _pipeline_state.get("lof_pipeline")
+    if lof is None or _pipeline_state.get("lof_key") != (pays, volet):
+        return dash.no_update, dash.no_update, (
+            f"LOF* non disponible pour {pays}/{volet} — lancez d'abord l'analyse LOF* "
+            "sur la page Analyse pour ce pays/volet, puis revenez ici."
+        )
+
+    user_id = (auth or {}).get("user_id")
+    hp = dict(
+        epochs=int(epochs) if epochs else C_BIVAT.EPOCHS,
+        window=int(window) if window else C_BIVAT.WINDOW_SIZE,
+        lr=float(lr) if lr else C_BIVAT.LR,
+        beta_kl=float(beta) if beta is not None else C_BIVAT.BETA,
+        lambda_ad=float(lambda_ad) if lambda_ad is not None else C_BIVAT.LAMBDA_AD,
+        train_end=train_end or None,
+        test_start=test_start or None,
+        cal_split=float(cal_split) if cal_split else None,
+    )
+    _launch_bivat_thread(pays, volet, user_id, force_retrain=True, **hp)
+    return True, False, "Entraînement lancé — suivez la progression dans le journal ci-dessous."
 
 
 @callback(

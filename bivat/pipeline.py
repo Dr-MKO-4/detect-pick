@@ -94,7 +94,11 @@ class PipelineBiVAT:
         n_layers: int = C.N_ENCODER_LAYERS,
         window: int = C.WINDOW_SIZE,
         beta_kl: float = C.BETA,
+        lambda_ad: float = C.LAMBDA_AD,
         lr: float = C.LR,
+        train_end: str | None = None,
+        test_start: str | None = None,
+        cal_split: float | None = None,
         log_callback: Callable[[str], None] | None = None,
         force_retrain: bool = False,
         compute_shap: bool = True,
@@ -110,13 +114,21 @@ class PipelineBiVAT:
         d_model, n_heads, n_layers : architecture hyperparameters (passed to BiVAT)
         window                     : sliding window length (months)
         beta_kl                    : KL weight in the ELBO loss
+        lambda_ad                  : poids de l'association discrepancy dans la loss
         lr                         : optimizer learning rate
+        train_end, test_start      : bornes du split (défaut : C.TRAIN_END/C.TEST_START
+                                      si None) — permet de reparamétrer la calibration
+                                      depuis l'UI (page Modèles) sans toucher au code.
+        cal_split                  : fraction du train prélevée en calibration si le
+                                      calendrier train_end→test_start est trop court
+                                      (défaut C.CAL_SPLIT si None)
         force_retrain              : if False and checkpoint exists, skip training
         compute_shap               : si False, saute l'étape SHAP DeepExplainer
                                       (coûteuse) — utile pour la recherche génétique
                                       d'hyperparamètres, qui n'exploite jamais
                                       shap_results dans sa fonction de fitness.
         """
+        cal_split = C.CAL_SPLIT if cal_split is None else cal_split
         self._pays  = pays.lower()
         self._volet = volet
         key = (self._pays, volet)
@@ -137,8 +149,8 @@ class PipelineBiVAT:
                     T, d, str(dates[0])[:10], str(dates[-1])[:10])
 
         # ── 2. Split : train / cal / test ─────────────────────────────────────
-        train_end  = pd.Timestamp(C.TRAIN_END)
-        test_start = pd.Timestamp(C.TEST_START)
+        train_end  = pd.Timestamp(train_end or C.TRAIN_END)
+        test_start = pd.Timestamp(test_start or C.TEST_START)
 
         train_mask = dates <= train_end
         cal_mask   = (dates > train_end) & (dates < test_start)
@@ -165,7 +177,7 @@ class PipelineBiVAT:
             # calibration au final — Fig. E illisible).
             n_train_full = int(train_mask.sum())
             n_cal_take   = max(window + C.MIN_CAL_WINDOWS - 1,
-                               int(n_train_full * C.CAL_SPLIT))
+                               int(n_train_full * cal_split))
             n_cal_take   = max(0, min(n_cal_take, n_train_full - window))  # garder du train
             logger.info(
                 "[BIVAT] Calendrier cal insuffisant (%d fenêtre(s) sur %d mois) — "
@@ -191,11 +203,11 @@ class PipelineBiVAT:
             self.dates_cal = dates_train_full[-take:].append(self.dates_cal) if n_cal_windows_calendar < C.MIN_CAL_WINDOWS else dates[train_mask][-take:].append(self.dates_cal)
 
         if len(X_test) == 0:
-            logger.warning("[BIVAT] Aucune donnée après TEST_START=%s  repli sur split 80/20", C.TEST_START)
+            logger.warning("[BIVAT] Aucune donnée après TEST_START=%s  repli sur split 80/20", test_start)
             split = int(len(X_full) * 0.8)
             X_train = X_full[:split]
             X_test  = X_full[split:]
-            X_cal   = X_train[-int(len(X_train) * C.CAL_SPLIT):]
+            X_cal   = X_train[-int(len(X_train) * cal_split):]
             self.dates_train = dates[:split]
             self.dates_test  = dates[split:]
             self.dates_cal   = self.dates_train[-len(X_cal):]
@@ -230,7 +242,7 @@ class PipelineBiVAT:
                 logger.warning("[BIVAT] Chargement poids échoué (%s)  ré-entraînement", _e)
                 self.model = BiVAT(d_in=d_in, d_model=d_model, nhead=n_heads, n_layers=n_layers)
                 self.history = train(self.model, X_train, epochs=epochs, lr=lr,
-                                      window=window, beta=beta_kl, log_callback=_log_cb)
+                                      window=window, beta=beta_kl, lambda_ad=lambda_ad, log_callback=_log_cb)
                 save_checkpoint(self.model, weights_path)
         else:
             if force_retrain:
@@ -241,7 +253,7 @@ class PipelineBiVAT:
             logger.info("[BIVAT] Architecture BiVAT instanciée  d_in=%d  d_model=%d  nhead=%d  n_layers=%d",
                         d_in, d_model, n_heads, n_layers)
             self.history = train(self.model, X_train, epochs=epochs, lr=lr,
-                                  window=window, beta=beta_kl, log_callback=_log_cb)
+                                  window=window, beta=beta_kl, lambda_ad=lambda_ad, log_callback=_log_cb)
             save_checkpoint(self.model, weights_path)
         logger.info("[BIVAT] Modèle prêt en %.1fs", time.time() - t_model)
 

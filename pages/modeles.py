@@ -1,10 +1,35 @@
 """Page Modèles  calibration LOF* et entraînement BiVAT."""
 import os
 from dash import html, dcc
+from config import PAYS, PAYS_LABELS, VOLETS
 from layout.icons import svg, ICO_PLAY, ICO_REFRESH, ICO_TERM, ICO_WARN
 
 
-def render_modeles() -> html.Div:
+_INPUT_STYLE = {
+    "width": "100%", "padding": "6px 10px",
+    "background": "var(--surf2)", "border": "1px solid var(--border2)",
+    "borderRadius": "3px", "color": "var(--text)",
+    "fontFamily": "inherit", "fontSize": "12px",
+}
+
+
+def _num_input(label: str, id_: str, value, step=1, mini=None, full_width: bool = False):
+    return html.Div(style={"gridColumn": "span 2" if full_width else None}, children=[
+        html.Div(label, style={"fontSize": "10px", "color": "var(--muted2)", "marginBottom": "3px"}),
+        dcc.Input(id=id_, type="number", value=value, step=step,
+                  **({"min": mini} if mini is not None else {}),
+                  style=_INPUT_STYLE),
+    ])
+
+
+def _text_input(label: str, id_: str, value: str):
+    return html.Div([
+        html.Div(label, style={"fontSize": "10px", "color": "var(--muted2)", "marginBottom": "3px"}),
+        dcc.Input(id=id_, type="text", value=value, placeholder="AAAA-MM-JJ", style=_INPUT_STYLE),
+    ])
+
+
+def render_modeles(pays: str = "cameroun", volet: str = "Actif") -> html.Div:
     import torch
     from utils.hardware import DEVICE
     if DEVICE.type == "cuda":
@@ -21,6 +46,27 @@ def render_modeles() -> html.Div:
             html.Span("Réentraînement & calibration", className="tb-page"),
             html.Span(f"Device : {device_str}", className="tb-context"),
         ]),
+        html.Div(
+            className="content",
+            style={"padding": "10px 14px 0", "display": "flex", "gap": "12px", "alignItems": "flex-end"},
+            children=[
+                html.Div(style={"flex": "0 0 180px"}, children=[
+                    html.Div("Pays", className="label"),
+                    dcc.Dropdown(id="dd-modeles-pays",
+                                 options=[{"label": PAYS_LABELS[p], "value": p} for p in PAYS],
+                                 value=pays, clearable=False, className="select"),
+                ]),
+                html.Div(style={"flex": "0 0 140px"}, children=[
+                    html.Div("Volet", className="label"),
+                    dcc.Dropdown(id="dd-modeles-volet",
+                                 options=[{"label": v, "value": v} for v in VOLETS],
+                                 value=volet, clearable=False, className="select"),
+                ]),
+                html.Div("Les recalibrages/ré-entraînements ci-dessous s'appliquent au "
+                         "pays/volet sélectionné ici (indépendant de la page Analyse).",
+                         style={"fontSize": "10px", "color": "var(--muted2)", "paddingBottom": "6px"}),
+            ],
+        ),
         html.Div(className="content",
                  style={"display": "grid", "gridTemplateColumns": "1fr 1fr",
                         "gap": "14px", "alignContent": "start"},
@@ -81,57 +127,43 @@ def render_modeles() -> html.Div:
                                        style={"marginLeft": "auto", "fontSize": "9px", "gap": "3px"}),
                          ]),
                          html.Div(className="panel-body",
-                                  style={"display": "flex", "flexDirection": "column", "gap": "12px"},
+                                  style={"display": "flex", "flexDirection": "column", "gap": "10px"},
                                   children=[
+                                      html.Div("ENTRAÎNEMENT", className="label"),
                                       html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr 1fr", "gap": "8px"},
                                                children=[
-                                                   html.Div(className="stat-card", style={"padding": "10px"}, children=[html.Div("200", className="stat-num", style={"fontSize": "18px"}), html.Div("Époques", className="stat-label")]),
-                                                   html.Div(className="stat-card", style={"padding": "10px"}, children=[html.Div("64",  className="stat-num", style={"fontSize": "18px"}), html.Div("d_model", className="stat-label")]),
-                                                   html.Div(className="stat-card", style={"padding": "10px"}, children=[html.Div("16",  className="stat-num", style={"fontSize": "18px"}), html.Div("Dim. latente", className="stat-label")]),
+                                                   _num_input("Époques",      "inp-bivat-epochs", 200, step=10, mini=1),
+                                                   _num_input("Fenêtre (mois)", "inp-bivat-window", 12, step=1, mini=4),
+                                                   _num_input("Learning rate", "inp-bivat-lr", 0.001, step=0.0001),
                                                ]),
-                                      html.Div([
-                                          html.Div("Fenêtre d'entraînement", className="label"),
-                                          dcc.Dropdown(id="dd-bivat-window",
-                                                       options=[{"label": l, "value": v} for l, v in [
-                                                           ("Déc 2001 → Déc 2019 (pré-test)", "pretrain"),
-                                                           ("Déc 2001 → Mar 2026 (complète)", "full"),
-                                                       ]],
-                                                       value="pretrain", clearable=False, className="select"),
-                                      ]),
                                       html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "8px"},
                                                children=[
-                                                   html.Div([
-                                                       html.Div("β (poids KL)", style={"fontSize": "10px", "color": "var(--muted2)", "marginBottom": "3px"}),
-                                                       dcc.Input(id="inp-bivat-beta", type="number", value=0.5, step=0.1,
-                                                                 style={"width": "100%", "padding": "6px 10px",
-                                                                        "background": "var(--surf2)",
-                                                                        "border": "1px solid var(--border2)",
-                                                                        "borderRadius": "3px", "color": "var(--text)",
-                                                                        "fontFamily": "inherit", "fontSize": "12px"}),
-                                                   ]),
-                                                   html.Div([
-                                                       html.Div("λ_ad (discrepancy)", style={"fontSize": "10px", "color": "var(--muted2)", "marginBottom": "3px"}),
-                                                       dcc.Input(id="inp-bivat-lad", type="number", value=0.1, step=0.01,
-                                                                 style={"width": "100%", "padding": "6px 10px",
-                                                                        "background": "var(--surf2)",
-                                                                        "border": "1px solid var(--border2)",
-                                                                        "borderRadius": "3px", "color": "var(--text)",
-                                                                        "fontFamily": "inherit", "fontSize": "12px"}),
-                                                   ]),
+                                                   _num_input("β (poids KL)", "inp-bivat-beta", 0.5, step=0.1),
+                                                   _num_input("λ_ad (association discrepancy)", "inp-bivat-lad", 0.1, step=0.01),
                                                ]),
+                                      html.Hr(style={"border": "none", "borderTop": "1px solid var(--border)", "margin": "2px 0"}),
+                                      html.Div("CALIBRATION (Prédiction Conforme)", className="label"),
+                                      html.Div(style={"display": "grid", "gridTemplateColumns": "1fr 1fr", "gap": "8px"},
+                                               children=[
+                                                   _text_input("Fin d'entraînement (train_end)", "inp-bivat-train-end", "2019-12-31"),
+                                                   _text_input("Début de test (test_start)",      "inp-bivat-test-start", "2020-03-01"),
+                                               ]),
+                                      _num_input("Repli calibration (% du train, si calendrier insuffisant)",
+                                                 "inp-bivat-cal-split", 0.20, step=0.05, full_width=True),
                                       html.Div(
+                                          id="bivat-train-hint",
                                           style={"padding": "10px", "background": "rgba(212,160,32,.06)",
                                                  "borderRadius": "4px", "border": "1px solid var(--gold-md)",
                                                  "fontSize": "11px", "color": "var(--muted)"},
-                                          children="Entraîner d'abord LOF* (page Analyse) puis revenir ici pour lancer BiVAT.",
+                                          children="Entraîner d'abord LOF* (page Analyse) pour le pays/volet "
+                                                   "sélectionné ci-dessus, puis lancer BiVAT ici.",
                                       ),
                                       html.Button(
                                           id="btn-train-bivat",
                                           className="btn btn-solid-gold",
                                           style={"width": "100%", "justifyContent": "center"},
-                                          disabled=True,
                                           n_clicks=0,
-                                          children=[svg(ICO_PLAY, size=12), " Entraîner BiVAT (à venir)"],
+                                          children=[svg(ICO_PLAY, size=12), " Entraîner / recalibrer BiVAT"],
                                       ),
                                   ]),
                      ]),
