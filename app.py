@@ -57,6 +57,7 @@ app.layout = html.Div(
         dcc.Store(id="store-progress",         data=0),
         dcc.Store(id="store-progress-label",   data=""),
         dcc.Store(id="store-notif-count",      data=0),
+        dcc.Store(id="store-refresh",          data=0),
         dcc.Store(id="store-historique-run-a", data=None),
         dcc.Store(id="store-historique-run-b", data=None),
         dcc.Store(id="store-donnees-del-idx",  data=None),
@@ -155,6 +156,7 @@ from layout import shell_layout
     Input("store-pipeline-running", "data"),
     Input("store-bivat-running",    "data"),
     Input("store-modele",           "data"),
+    Input("store-refresh",          "data"),
     State("store-progress",         "data"),
     State("store-progress-label",   "data"),
     State("store-pays",             "data"),
@@ -163,7 +165,7 @@ from layout import shell_layout
     State("store-theme",            "data"),
 )
 def render_page(page, results, bivat_results, phase,
-                running, bivat_running, modele, progress, progress_label,
+                running, bivat_running, modele, _refresh, progress, progress_label,
                 pays, volet, auth, theme):
     # Rediriger vers login si pas authentifié
     if not auth and page != "login":
@@ -186,7 +188,9 @@ def render_page(page, results, bivat_results, phase,
         # Ne re-scanne le dossier data/ que si on vient d'y naviguer — un store
         # sans rapport (progression pipeline, résultats…) ne doit pas relancer
         # le glob + la lecture des métadonnées XLSX.
-        files = refresh_scan_cache() if ctx.triggered_id == "store-page" else scan_files_cached()
+        files = (refresh_scan_cache()
+                 if ctx.triggered_id in ("store-page", "store-refresh")
+                 else scan_files_cached())
         return _shell(page, donnees_layout(files),
                       pays=pays or "cameroun", volet=volet or "Actif",
                       running=any_running)

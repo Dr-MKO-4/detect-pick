@@ -109,3 +109,15 @@ def switch_model_btn(n_lof, n_bivat):
 )
 def sync_modele(v):
     return v or "lof"
+
+
+@callback(
+    Output("store-refresh", "data"),
+    Input("btn-refresh-page", "n_clicks"),
+    State("store-refresh",    "data"),
+    prevent_initial_call=True,
+)
+def refresh_page(n, current):
+    if not n:
+        return dash.no_update
+    return (current or 0) + 1

@@ -503,18 +503,28 @@ def start_bivat_pipeline(n, pays, volet, modele, auth):
 
 
 @callback(
-    Output("store-bivat-results", "data"),
-    Output("store-bivat-running", "data", allow_duplicate=True),
-    Output("interval-bivat",      "disabled", allow_duplicate=True),
+    Output("store-bivat-results",  "data"),
+    Output("store-bivat-running",  "data", allow_duplicate=True),
+    Output("interval-bivat",       "disabled", allow_duplicate=True),
+    Output("store-progress",       "data", allow_duplicate=True),
+    Output("store-progress-label", "data", allow_duplicate=True),
     Input("interval-bivat",       "n_intervals"),
     prevent_initial_call=True,
 )
 def poll_bivat(n):
+    # store-progress / store-progress-label sont partagés avec poll_pipeline
+    # (LOF) — c'est déjà le contrat attendu par la barre de progression
+    # globale (callbacks/extras.py, callback "Animations globales"), qui
+    # affiche le libellé "BiVAT" via store-bivat-running. Avant ce correctif,
+    # seul poll_pipeline les alimentait : une exécution BiVAT seule (LOF déjà
+    # en cache) n'affichait donc jamais aucune barre de progression.
+    progress = _bivat_state.get("progress", 0)
+    label    = _bivat_state.get("label", "")
     if not _bivat_state["running"] and _bivat_state["results"] is not None:
-        return _bivat_state["results"], False, True
+        return _bivat_state["results"], False, True, progress, label
     # Même raison que poll_pipeline() : store-bivat-running est un Input de
     # render_page, ne le repousser que lors d'un changement réel.
-    return dash.no_update, dash.no_update, dash.no_update
+    return dash.no_update, dash.no_update, dash.no_update, progress, label
 
 
 # ── Journal page Modèles ──────────────────────────────────────────────────────

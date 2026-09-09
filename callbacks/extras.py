@@ -389,13 +389,14 @@ def _ok(msg: str):
 
 clientside_callback(
     """
-    function(progress, label, running) {
+    function(progress, label, running, bivatRunning) {
         var fill  = document.getElementById('pg-fill');
         var lbl   = document.getElementById('pg-label');
         var pct   = document.getElementById('pg-pct');
         var panel = document.getElementById('pg-running-panel');
         var btnRun  = document.getElementById('btn-run-pipeline');
         var btnStop = document.getElementById('btn-stop-pipeline');
+        var anyRunning = Boolean(running) || Boolean(bivatRunning);
 
         if (fill) fill.style.width = (progress || 0) + '%';
         if (lbl)  lbl.textContent = label || 'En cours…';
@@ -409,9 +410,9 @@ clientside_callback(
         if (lofStep) lofStep.className = 'vs-step' + (p >= 65 ? ' vs-step-done' : p >= 20 ? ' vs-step-active' : '');
         if (figs)    figs.className    = 'vs-step' + (p >= 95 ? ' vs-step-done' : p >= 65 ? ' vs-step-active' : '');
 
-        if (panel)   panel.style.display   = running ? 'block' : 'none';
-        if (btnRun)  btnRun.style.display  = running ? 'none'  : 'flex';
-        if (btnStop) btnStop.style.display = running ? 'flex'  : 'none';
+        if (panel)   panel.style.display   = anyRunning ? 'block' : 'none';
+        if (btnRun)  btnRun.style.display  = anyRunning ? 'none'  : 'flex';
+        if (btnStop) btnStop.style.display = anyRunning ? 'flex'  : 'none';
 
         return window.dash_clientside.no_update;
     }
@@ -420,6 +421,7 @@ clientside_callback(
     Input("store-progress",         "data"),
     Input("store-progress-label",   "data"),
     Input("store-pipeline-running", "data"),
+    Input("store-bivat-running",    "data"),
 )
 
 

@@ -4,7 +4,7 @@ from .icons import (
     svg,
     ICO_FILE, ICO_PULSE, ICO_GRID, ICO_MODEL,
     ICO_SETTINGS, ICO_USERS, ICO_SLIDERS,
-    ICO_CLOCK, ICO_BELL, ICO_SEARCH,
+    ICO_CLOCK, ICO_BELL, ICO_SEARCH, ICO_REFRESH,
 )
 from config import PAYS_LABELS
 
@@ -30,9 +30,16 @@ def sidebar(active_page: str, slim: bool = False, running: bool = False,
             ])
         )
 
-    def _item(label, icon_d, page_id="", active=False):
+    def _item(label, icon_d, page_id="", active=False, alert=False):
         cls = "nav-item active" if active else "nav-item"
-        children = [html.Div(className="nav-icon", children=[svg(icon_d, size=16)])]
+        if alert:
+            cls += " nav-item-running"
+        icon_children = [svg(icon_d, size=16)]
+        if alert:
+            # Pastille rouge clignotante : une analyse tourne en arrière-plan,
+            # visible même si l'utilisateur est sur une autre page.
+            icon_children.append(html.Span(className="nav-running-dot"))
+        children = [html.Div(className="nav-icon", children=icon_children)]
         if not slim:
             children.append(html.Div(label, className="nav-label"))
         kw = {"id": f"nav-{page_id}", "n_clicks": 0} if page_id else {}
@@ -46,7 +53,7 @@ def sidebar(active_page: str, slim: bool = False, running: bool = False,
     nav_items = [
         html.Div("Principal", className="nav-section-label"),
         _item("Données",      ICO_FILE,     "donnees",      active_page == "donnees"),
-        _item("Analyse",      ICO_PULSE,    "analyse",      active_page == "analyse"),
+        _item("Analyse",      ICO_PULSE,    "analyse",      active_page == "analyse", alert=running),
         _item("Rapport",      ICO_GRID,     "rapport",      active_page == "rapport"),
         html.Div("Avancé", className="nav-section-label"),
         _item("Modèles",      ICO_MODEL,    "modeles",      active_page == "modeles"),
@@ -86,13 +93,21 @@ def sidebar(active_page: str, slim: bool = False, running: bool = False,
             ]
         ))
 
-    # Recherche + notifications (toujours visibles en bas, avant Paramètres)
+    # Recherche + actualiser + notifications (toujours visibles en bas, avant Paramètres)
     footer_children.append(html.Div(
         id="btn-open-search", n_clicks=0, className="nav-item",
         role="button", tabIndex=0,
         children=[
             html.Div(className="nav-icon", children=[svg(ICO_SEARCH, size=16)]),
             html.Div("Rechercher", className="nav-label") if not slim else None,
+        ],
+    ))
+    footer_children.append(html.Div(
+        id="btn-refresh-page", n_clicks=0, className="nav-item",
+        role="button", tabIndex=0, title="Actualiser la page sans naviguer",
+        children=[
+            html.Div(className="nav-icon", children=[svg(ICO_REFRESH, size=16)]),
+            html.Div("Actualiser", className="nav-label") if not slim else None,
         ],
     ))
     badge_cls = "notif-badge" if unread_count else "notif-badge hidden"
