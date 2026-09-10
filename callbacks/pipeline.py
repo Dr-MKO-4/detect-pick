@@ -675,39 +675,20 @@ def start_bivat_pipeline(n, pays, volet, modele, auth):
 
 # ── Page Modèles : entraînement / recalibration BiVAT reparamétrable ─────────
 
-@callback(
-    Output("store-bivat-running",  "data", allow_duplicate=True),
-    Output("interval-bivat",       "disabled", allow_duplicate=True),
-    Output("bivat-train-hint",     "children"),
-    Input("btn-train-bivat",       "n_clicks"),
-    State("dd-modeles-pays",       "value"),
-    State("dd-modeles-volet",      "value"),
-    State("inp-bivat-epochs",      "value"),
-    State("inp-bivat-window",      "value"),
-    State("inp-bivat-lr",          "value"),
-    State("inp-bivat-beta",        "value"),
-    State("inp-bivat-lad",         "value"),
-    State("inp-bivat-train-end",   "value"),
-    State("inp-bivat-test-start",  "value"),
-    State("inp-bivat-cal-split",   "value"),
-    State("store-auth",            "data"),
-    prevent_initial_call=True,
-)
-def start_bivat_training(n, pays, volet, epochs, window, lr, beta, lambda_ad,
-                         train_end, test_start, cal_split, auth):
-    """Bouton "Entraîner / recalibrer BiVAT" de la page Modèles : lance
-    fit_from_lof() avec les hyperparamètres saisis (entraînement + split de
-    calibration), en forçant le ré-entraînement — reparamétrer n'a de sens
-    que si le résultat change réellement. Indépendant de la page Analyse :
-    utilise pays/volet choisis sur cette page (LOF* doit déjà avoir tourné
-    dessus, via la page Analyse)."""
-    if not n:
-        return dash.no_update, dash.no_update, dash.no_update
+def _bivat_checkpoint_path(pays: str, volet: str) -> str:
+    return os.path.join("models", f"bivat_{pays.lower()}_{volet.lower()}.pt")
+
+
+def _do_launch_bivat_training(pays, volet, epochs, window, lr, beta, lambda_ad,
+                               train_end, test_start, cal_split, auth):
+    """Logique partagée par le clic direct (pas de checkpoint existant, rien
+    à perdre) et par la confirmation (checkpoint existant, écrasé après
+    accord explicite). Retourne (running, interval_disabled, hint)."""
+    pays  = pays or "cameroun"
+    volet = volet or "Actif"
     if _bivat_state.get("running") or _pipeline_state.get("running"):
         return dash.no_update, dash.no_update, "Une analyse est déjà en cours — réessayez ensuite."
 
-    pays  = pays or "cameroun"
-    volet = volet or "Actif"
     lof = _pipeline_state.get("lof_pipeline")
     if lof is None or _pipeline_state.get("lof_key") != (pays, volet):
         return dash.no_update, dash.no_update, (
@@ -727,6 +708,80 @@ def start_bivat_training(n, pays, volet, epochs, window, lr, beta, lambda_ad,
         cal_split=float(cal_split) if cal_split else None,
     )
     _launch_bivat_thread(pays, volet, user_id, force_retrain=True, **hp)
+    return True, False, "Entraînement lancé — suivez la progression dans le journal ci-dessous."
+
+
+@callback(
+    Output("store-bivat-running",     "data", allow_duplicate=True),
+    Output("interval-bivat",          "disabled", allow_duplicate=True),
+    Output("bivat-train-hint",        "children"),
+    Output("confirm-bivat-retrain",   "displayed"),
+    Output("confirm-bivat-retrain",   "message"),
+    Input("btn-train-bivat",          "n_clicks"),
+    State("dd-modeles-pays",       "value"),
+    State("dd-modeles-volet",      "value"),
+    State("inp-bivat-epochs",      "value"),
+    State("inp-bivat-window",      "value"),
+    State("inp-bivat-lr",          "value"),
+    State("inp-bivat-beta",        "value"),
+    State("inp-bivat-lad",         "value"),
+    State("inp-bivat-train-end",   "value"),
+    State("inp-bivat-test-start",  "value"),
+    State("inp-bivat-cal-split",   "value"),
+    State("store-auth",            "data"),
+    prevent_initial_call=True,
+)
+def start_bivat_training(n, pays, volet, epochs, window, lr, beta, lambda_ad,
+                         train_end, test_start, cal_split, auth):
+    """Bouton "Entraîner / recalibrer BiVAT" de la page Modèles.
+
+    Si un checkpoint existe déjà pour ce pays/volet (donc potentiellement
+    utilisé en ce moment par la page Analyse), demande confirmation avant
+    d'écraser — l'ancien poids reste de toute façon sauvegardé en .pt.bak
+    (voir bivat/training.py:save_checkpoint), mais mieux vaut prévenir avant
+    que de compter uniquement sur le filet de sécurité."""
+    if not n:
+        return dash.no_update, dash.no_update, dash.no_update, False, dash.no_update
+
+    pays  = pays or "cameroun"
+    volet = volet or "Actif"
+    if os.path.exists(_bivat_checkpoint_path(pays, volet)):
+        msg = (f"Un modèle BiVAT existe déjà pour {pays}/{volet} et est peut-être "
+               "utilisé actuellement sur la page Analyse. Le ré-entraîner l'écrasera "
+               "(l'ancien poids sera gardé en .pt.bak). Continuer ?")
+        return dash.no_update, dash.no_update, dash.no_update, True, msg
+
+    running, disabled, hint = _do_launch_bivat_training(
+        pays, volet, epochs, window, lr, beta, lambda_ad,
+        train_end, test_start, cal_split, auth)
+    return running, disabled, hint, False, dash.no_update
+
+
+@callback(
+    Output("store-bivat-running",  "data", allow_duplicate=True),
+    Output("interval-bivat",       "disabled", allow_duplicate=True),
+    Output("bivat-train-hint",     "children", allow_duplicate=True),
+    Input("confirm-bivat-retrain", "submit_n_clicks"),
+    State("dd-modeles-pays",       "value"),
+    State("dd-modeles-volet",      "value"),
+    State("inp-bivat-epochs",      "value"),
+    State("inp-bivat-window",      "value"),
+    State("inp-bivat-lr",          "value"),
+    State("inp-bivat-beta",        "value"),
+    State("inp-bivat-lad",         "value"),
+    State("inp-bivat-train-end",   "value"),
+    State("inp-bivat-test-start",  "value"),
+    State("inp-bivat-cal-split",   "value"),
+    State("store-auth",            "data"),
+    prevent_initial_call=True,
+)
+def confirm_bivat_retrain(n, pays, volet, epochs, window, lr, beta, lambda_ad,
+                          train_end, test_start, cal_split, auth):
+    if not n:
+        return dash.no_update, dash.no_update, dash.no_update
+    return _do_launch_bivat_training(
+        pays, volet, epochs, window, lr, beta, lambda_ad,
+        train_end, test_start, cal_split, auth)
     return True, False, "Entraînement lancé — suivez la progression dans le journal ci-dessous."
 
 

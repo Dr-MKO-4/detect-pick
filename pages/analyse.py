@@ -4,6 +4,20 @@ from dash import html, dcc
 from config import PAYS, PAYS_LABELS, VOLETS
 from layout.icons import svg, ICO_PULSE, ICO_PLAY, ICO_STOP, ICO_CHECK, ICO_WARN
 
+def _bivat_hp_info(pays: str, volet: str) -> dict | None:
+    """Lit le sidecar d'hyperparamètres écrit à côté du checkpoint BiVAT
+    (bivat/pipeline.py:fit_from_lof), pour tracer avec quels réglages le
+    modèle actuellement chargé a été entraîné — sans ça, Fig. E/D changent
+    d'un run à l'autre sans qu'on sache pourquoi."""
+    import json, os
+    path = os.path.join("models", f"bivat_{pays.lower()}_{volet.lower()}.pt.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
 _fig_cache: dict = {}   # (fig_id, json_prefix) → go.Figure  évite pio.from_json répété
 
 def _cached_fig(fig_id: str, fig_json: str):
@@ -203,13 +217,18 @@ def render_analyse(pays: str = "cameroun", volet: str = "Actif",
     phase_btns = []
     for i in range(1, 5):
         disabled = i not in valid_phases
+        title = (f"{_PHASE_BTN_LABELS[i]} n'existe que pour "
+                 f"{'LOF*' if is_bivat else 'BiVAT'} — changez de modèle pour y accéder."
+                 if disabled else None)
         phase_btns.append(html.Button(
             _PHASE_BTN_LABELS[i],
             className="btn btn-gold" if i == phase else "btn btn-ghost",
             id=f"btn-phase-{i}",
             disabled=disabled,
+            title=title,
             style={"fontSize": "11px", "padding": "5px 10px",
-                   "opacity": "0.3" if disabled else "1"},
+                   "opacity": "0.3" if disabled else "1",
+                   "cursor": "not-allowed" if disabled else "pointer"},
         ))
 
     fig_specs = (_BIVAT_PHASE_FIGS if is_bivat else _LOF_PHASE_FIGS).get(phase, [])
@@ -291,6 +310,21 @@ def render_analyse(pays: str = "cameroun", volet: str = "Actif",
             children=[svg(ICO_WARN, size=11, stroke="var(--gold)"),
                      " Exécutez d'abord LOF* pour ce pays/volet avant de lancer BiVAT."],
         )
+    elif is_bivat and results:
+        hp = _bivat_hp_info(pays, volet)
+        if hp:
+            notice = html.Div(
+                style={"padding": "8px 16px", "background": "var(--surf2)",
+                       "border": "1px solid var(--border)", "borderRadius": "5px",
+                       "fontSize": "10.5px", "color": "var(--muted)", "marginBottom": "14px",
+                       "gridColumn": "span 2", "fontFamily": "Roboto Mono, monospace"},
+                children=(
+                    f"Modèle chargé — epochs={hp['epochs']} · fenêtre={hp['window']} · "
+                    f"lr={hp['lr']} · β={hp['beta_kl']} · λ_ad={hp['lambda_ad']} · "
+                    f"train_end={hp['train_end']} · test_start={hp['test_start']} · "
+                    f"cal_split={hp['cal_split']} · entraîné le {hp['trained_at'][:16].replace('T', ' ')}"
+                ),
+            )
 
     topbar_div = html.Div(className="topbar", children=[
         html.Span("Analyse", className="tb-section"),

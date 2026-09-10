@@ -44,9 +44,7 @@ def render_login() -> html.Div:
                             )
                             for txt in [
                                 "6 États membres de la CEMAC",
-                                "195 périodes mensuelles · 2001–2026",
-                                "55 indicateurs monétaires par pays",
-                                "Modèles LOF* et BiVAT",
+                                "Modèles LOF*, BiVAT & KAN",
                             ]
                         ],
                     ),

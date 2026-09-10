@@ -13,6 +13,9 @@ cache/
 # Résultats de recherche d'hyperparamètres (régénérables via optimize.py)
 models/hp/
 
+# Sauvegarde automatique du poids BiVAT précédent avant écrasement
+models/*.pt.bak
+
 # Logs
 logs/*.log
 

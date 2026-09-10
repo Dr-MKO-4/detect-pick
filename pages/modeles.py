@@ -165,6 +165,10 @@ def render_modeles(pays: str = "cameroun", volet: str = "Actif") -> html.Div:
                                           n_clicks=0,
                                           children=[svg(ICO_PLAY, size=12), " Entraîner / recalibrer BiVAT"],
                                       ),
+                                      dcc.ConfirmDialog(
+                                          id="confirm-bivat-retrain",
+                                          message="",
+                                      ),
                                   ]),
                      ]),
                      # ── Journal d'entraînement ─────────────────────────────────

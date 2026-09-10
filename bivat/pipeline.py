@@ -233,6 +233,22 @@ class PipelineBiVAT:
                 log_callback(msg)
 
         weights_path = os.path.join("models", f"bivat_{self._pays}_{self._volet.lower()}.pt")
+        hp_record = {
+            "epochs": epochs, "d_model": d_model, "n_heads": n_heads, "n_layers": n_layers,
+            "window": window, "beta_kl": beta_kl, "lambda_ad": lambda_ad, "lr": lr,
+            "train_end": str(train_end.date()), "test_start": str(test_start.date()),
+            "cal_split": cal_split,
+            "trained_at": pd.Timestamp.now().isoformat(timespec="seconds"),
+        }
+
+        def _save_hp_sidecar():
+            try:
+                import json
+                with open(weights_path + ".json", "w", encoding="utf-8") as f:
+                    json.dump(hp_record, f, indent=2)
+            except Exception as e:
+                logger.warning("[BIVAT] Sidecar hyperparamètres non écrit : %s", e)
+
         t_model = time.time()
         if not force_retrain and os.path.exists(weights_path):
             try:
@@ -244,6 +260,7 @@ class PipelineBiVAT:
                 self.history = train(self.model, X_train, epochs=epochs, lr=lr,
                                       window=window, beta=beta_kl, lambda_ad=lambda_ad, log_callback=_log_cb)
                 save_checkpoint(self.model, weights_path)
+                _save_hp_sidecar()
         else:
             if force_retrain:
                 logger.info("[BIVAT] force_retrain=True  entraînement depuis zéro")
@@ -255,6 +272,7 @@ class PipelineBiVAT:
             self.history = train(self.model, X_train, epochs=epochs, lr=lr,
                                   window=window, beta=beta_kl, lambda_ad=lambda_ad, log_callback=_log_cb)
             save_checkpoint(self.model, weights_path)
+            _save_hp_sidecar()
         logger.info("[BIVAT] Modèle prêt en %.1fs", time.time() - t_model)
 
         # ── 4. Scoring + Conformal Prediction ────────────────────────────────

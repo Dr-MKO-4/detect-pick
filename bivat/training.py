@@ -212,6 +212,18 @@ def train(
 
 def save_checkpoint(model: BiVAT, path: str = C.WEIGHTS_PATH) -> None:
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    # Un seul cran de sauvegarde de secours : si un poids existe déjà à cet
+    # emplacement (analyse en production dessus), le garder de côté avant de
+    # l'écraser — un ré-entraînement raté ou un mauvais choix
+    # d'hyperparamètres depuis la page Modèles ne perd pas le modèle
+    # précédent silencieusement.
+    if os.path.exists(path):
+        try:
+            import shutil
+            shutil.copy2(path, path + ".bak")
+            logger.info(f"[BIVAT] Ancien poids sauvegardé → {path}.bak")
+        except Exception as e:
+            logger.warning(f"[BIVAT] Sauvegarde de l'ancien poids échouée : {e}")
     torch.save({
         "state_dict": model.state_dict(),
         "d_in": model.d_in,

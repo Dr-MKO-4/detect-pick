@@ -1,0 +1,14 @@
+{
+  "epochs": 5,
+  "d_model": 64,
+  "n_heads": 4,
+  "n_layers": 2,
+  "window": 12,
+  "beta_kl": 0.5,
+  "lambda_ad": 0.1,
+  "lr": 0.001,
+  "train_end": "2019-12-31",
+  "test_start": "2020-03-01",
+  "cal_split": 0.2,
+  "trained_at": "2026-09-10T11:45:26"
+}
