@@ -1319,6 +1319,15 @@ option { background: #111; color: #e8e8e8; }
   animation: spin 0.7s linear infinite;
   flex-shrink: 0;
 }
+/* Spinner inline pour un bouton en cours de traitement (ex. btn-train-bivat) */
+.spinner-inline {
+  display: inline-block; width: 12px; height: 12px;
+  border: 2px solid rgba(0,0,0,.25);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0; vertical-align: -2px;
+}
 .gst-text { flex: 1; min-width: 0; }
 .gst-title {
   font-size: 11px;

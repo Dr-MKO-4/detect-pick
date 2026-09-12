@@ -171,28 +171,75 @@ def _build_pdf_report(rtype, rmodele, pays_label, volet_label,
 
 @callback(
     Output("lof-calibration-status", "children"),
+    Output("store-results",          "data", allow_duplicate=True),
     Input("btn-run-lof-all",         "n_clicks"),
     State("dd-lof-tau",              "value"),
     prevent_initial_call=True,
 )
 def recalibrate_lof(n, tau_method):
+    """Recalcule réellement τ (Tukey/IQR ou p95) pour le dernier pays/volet
+    LOF* analysé, à partir des scores déjà en mémoire — pas besoin de
+    relancer STL/RPCA/LOF*, juste un quantile sur des scores existants.
+    Régénère ensuite les figures qui dépendent de τ pour rester cohérentes
+    avec la nouvelle valeur affichée dans le bandeau LOF*."""
     if not n:
-        return dash.no_update
+        return dash.no_update, dash.no_update
     lof_p = _pipeline_state.get("lof_pipeline")
-    if lof_p is None:
+    key   = _pipeline_state.get("lof_key")
+    if lof_p is None or key is None:
         return [
             dash.html.Div("Aucun pipeline LOF chargé.",
                           style={"fontSize": "11px", "color": "var(--red)", "fontWeight": "700"}),
             dash.html.Div("Lancez d'abord l'analyse sur la page Analyse.",
                           style={"fontSize": "10px", "color": "var(--muted)"}),
-        ]
+        ], dash.no_update
+
+    from beac_lof.detection import seuil_tau
     tau_labels = {"iqr15": "Q3 + 1,5 × IQR", "iqr20": "Q3 + 2,0 × IQR", "p95": "Percentile 95%"}
+    scores = lof_p.scores_lof.get(key)
+    if scores is None or scores.empty:
+        return [dash.html.Div("Scores LOF* indisponibles pour ce pays/volet.",
+                              style={"fontSize": "11px", "color": "var(--red)"})], dash.no_update
+
+    tau_new, p95_new = seuil_tau(scores.values, method=tau_method)
+    lof_p.tau[key]      = tau_new
+    lof_p.tau_p95[key]  = p95_new
+    lof_p.tau_method    = tau_method
+
+    pays, volet = key
+    n_anom = int((scores.values > tau_new).sum())
+
+    # Régénère les figures qui affichent τ, pour que la vue Analyse reflète
+    # immédiatement le nouveau seuil au prochain "Actualiser".
+    results = _pipeline_state.get("results")
+    if results and results.get("pays") == pays and results.get("volet") == volet:
+        try:
+            import plotly.io as pio
+            g = lof_p.vers_graphiques()
+            figs = dict(results.get("figures_json") or {})
+            for fig_id, fn in [
+                ("fig8",  lambda: g.fig8_distribution_lof(pays, volet)),
+                ("fig9",  lambda: g.fig9_boxplot_lof_annee(pays, volet)),
+                ("fig10", lambda: g.fig10_serie_temporelle_lof(pays, volet, animate=False)),
+                ("fig12", lambda: g.fig12_bar_chart_indicateurs(pays, volet)),
+                ("fig13", lambda: g.fig13_heatmap_anomalies(pays, volet)),
+            ]:
+                try:
+                    figs[fig_id] = pio.to_json(fn())
+                except Exception:
+                    pass
+            results = dict(results, figures_json=figs)
+            _pipeline_state["results"] = results
+        except Exception:
+            pass
+
     return [
         dash.html.Div(f"Méthode de seuil : {tau_labels.get(tau_method, tau_method)}",
                       style={"fontSize": "11px", "color": "var(--green)", "fontWeight": "700"}),
-        dash.html.Div("Relancez l'analyse pour recalculer.",
+        dash.html.Div(f"τ recalculé pour {pays}/{volet} : {tau_new:.3f} "
+                      f"({n_anom} anomalies) — figures mises à jour.",
                       style={"fontSize": "10px", "color": "var(--muted)", "marginTop": "4px"}),
-    ]
+    ], (results if results else dash.no_update)
 
 
 # ── Fermeture dropdowns menu Dash (clientside) ────────────────────────────────

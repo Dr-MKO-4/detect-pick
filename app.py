@@ -215,7 +215,8 @@ def render_page(page, results, bivat_results, phase,
                       pays=pays or "cameroun", volet=volet or "Actif")
 
     if page == "modeles":
-        return _shell(page, render_modeles(pays=pays or "cameroun", volet=volet or "Actif"), running=any_running,
+        return _shell(page, render_modeles(pays=pays or "cameroun", volet=volet or "Actif",
+                                           running=any_running), running=any_running,
                       pays=pays or "cameroun", volet=volet or "Actif")
 
     if page == "optimisation":

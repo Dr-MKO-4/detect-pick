@@ -29,7 +29,7 @@ def _text_input(label: str, id_: str, value: str):
     ])
 
 
-def render_modeles(pays: str = "cameroun", volet: str = "Actif") -> html.Div:
+def render_modeles(pays: str = "cameroun", volet: str = "Actif", running: bool = False) -> html.Div:
     import torch
     from utils.hardware import DEVICE
     if DEVICE.type == "cuda":
@@ -163,7 +163,12 @@ def render_modeles(pays: str = "cameroun", volet: str = "Actif") -> html.Div:
                                           className="btn btn-solid-gold",
                                           style={"width": "100%", "justifyContent": "center"},
                                           n_clicks=0,
-                                          children=[svg(ICO_PLAY, size=12), " Entraîner / recalibrer BiVAT"],
+                                          disabled=running,
+                                          children=(
+                                              [html.Span(className="spinner-inline"), " Entraînement en cours…"]
+                                              if running else
+                                              [svg(ICO_PLAY, size=12), " Entraîner / recalibrer BiVAT"]
+                                          ),
                                       ),
                                       dcc.ConfirmDialog(
                                           id="confirm-bivat-retrain",
