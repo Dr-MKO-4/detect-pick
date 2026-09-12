@@ -343,6 +343,19 @@ body {
 .btn-solid-gold:hover { filter: brightness(1.1); }
 button { border-radius: 0 !important; }
 
+/* Anneau de focus clavier cohérent sur tous les boutons natifs — jusqu'ici
+   seuls les éléments role="button" (nav, cartes cliquables) en avaient un ;
+   .btn (Exécuter, Enregistrer, Entraîner…) gardait le contour par défaut du
+   navigateur, incohérent avec le reste de l'identité visuelle. */
+.btn:focus-visible, button:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.btn:disabled, button:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+}
+
 /* ══════════════════════════════════════════════════════
    FORMULAIRES
    ══════════════════════════════════════════════════════ */
