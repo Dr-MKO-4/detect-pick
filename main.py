@@ -17,10 +17,9 @@ from PyQt6.QtCore import Qt
 
 from qt.splash import make_splash
 from qt.window import BEACWindow
+from config import HOST, PORT
 
-HOST = "127.0.0.1"
-PORT = 8050
-URL  = f"http://{HOST}:{PORT}"
+URL = f"http://{HOST}:{PORT}"
 ICON = os.path.join(os.path.dirname(__file__), "assets", "logo_beac.jfif")
 
 

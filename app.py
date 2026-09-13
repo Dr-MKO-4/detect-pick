@@ -247,7 +247,6 @@ def render_page(page, results, bivat_results, phase,
 
 # ── Lancement en mode développement ───────────────────────────────────────────
 if __name__ == "__main__":
-    _HOST = "127.0.0.1"
-    _PORT = 8050
+    from config import HOST as _HOST, PORT as _PORT
 
     app.run(debug=DEV, host=_HOST, port=_PORT, use_reloader=False)

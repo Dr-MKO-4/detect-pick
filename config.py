@@ -17,5 +17,8 @@ PAYS_LABELS: dict[str, str] = {
 }
 VOLETS = ["Actif", "Passif"]
 
-HOST = "127.0.0.1"
-PORT = 8050
+HOST = os.getenv("BEAC_HOST", "127.0.0.1")
+# Source unique du port, en développement (app.py) comme en production
+# (main.py) — modifiable sans toucher au code via la variable d'environnement
+# BEAC_PORT, pour éviter les collisions avec une autre appli locale.
+PORT = int(os.getenv("BEAC_PORT", "8060"))
