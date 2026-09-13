@@ -317,6 +317,18 @@ body {
   background: var(--surf2);
 }
 .panel-title { font-size: 12px; font-weight: 600; color: var(--text); }
+
+/* Cadre de figure redimensionnable : la hauteur Python de chaque figure
+   (calibrée à son contenu — 750px pour une décomposition à 4 panneaux,
+   420px pour un histogramme) reste la hauteur de départ, mais n'importe
+   quel cadre peut être agrandi/réduit à la souris (poignée en bas à
+   droite) — Plotly (config.responsive=true) redessine automatiquement au
+   nouveau format grâce à son ResizeObserver interne. */
+.fig-body-resizable {
+  resize: vertical;
+  overflow: auto;
+  min-height: 220px;
+}
 .panel-sub   { font-size: 11px; color: var(--muted); margin-left: auto; }
 .panel-body  { padding: 13px; }
 

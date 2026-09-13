@@ -252,12 +252,21 @@ def render_analyse(pays: str = "cameroun", volet: str = "Actif",
                 # phase, de résultats, de statut du pipeline…) même si la figure
                 # elle-même n'a pas changé.
                 fig_obj.update_layout(uirevision=fig_id)
-                body = dcc.Graph(
-                    id=f"graph-{fig_id}",
-                    figure=fig_obj,
-                    config={"displayModeBar": True, "responsive": True,
-                            "toImageButtonOptions": {"format": "png", "scale": 2}},
-                    style={"minHeight": "340px"},
+                # Hauteur d'origine calibrée par la figure elle-même (750px
+                # pour une décomposition 4 panneaux, 420px pour un
+                # histogramme…) — sert de point de départ au cadre
+                # redimensionnable ci-dessous, pas une valeur figée.
+                start_height = fig_obj.layout.height or 480
+                body = html.Div(
+                    className="fig-body-resizable",
+                    style={"height": f"{start_height}px"},
+                    children=dcc.Graph(
+                        id=f"graph-{fig_id}",
+                        figure=fig_obj,
+                        config={"displayModeBar": True, "responsive": True,
+                                "toImageButtonOptions": {"format": "png", "scale": 2}},
+                        style={"height": "100%", "width": "100%"},
+                    ),
                 )
                 tag = html.Span([svg(ICO_CHECK, size=9, stroke="currentColor"), " Calculé"],
                                 className="tag tag-green",

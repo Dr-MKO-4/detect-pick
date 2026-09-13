@@ -160,13 +160,19 @@ class BEACGraphiques:
             pays_list = PAYS_CEMAC
         if volets_list is None:
             volets_list = VOLETS
+        # idx doit compter les paires RETENUES (celles pour lesquelles
+        # trace_updates/layout_updates ont une entrée), pas les 12 combos
+        # pays×volet en tout — sinon dès que le premier combo manquant
+        # (ex. cameroun/Actif non encore analysé) précède un combo présent,
+        # l'index déborde de trace_updates (IndexError). Ne restait invisible
+        # que parce que "cameroun/Actif" — le tout premier combo — était
+        # systématiquement testé en premier, donc idx=0 par coïncidence.
         buttons = []
         idx = 0
         for pays in pays_list:
             for volet in volets_list:
                 k = (pays.lower(), volet)
                 if k not in self.scores_lof and k not in self.residus and k not in self.data_brute:
-                    idx += 1
                     continue
                 args = [trace_updates[idx]]
                 if layout_updates:
